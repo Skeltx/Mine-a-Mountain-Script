@@ -7,4 +7,4 @@ Roblox Script for place Mine a Mountain.
 
 Мои соцсети (посмотрите хотябы, необязательно подписываться).
 
-(Telegram)[https://t.me/ske1tx], (Discord)[https://discord.gg/Pz9JgYeGrq], (Playground.ru)[https://users.playground.ru/6561365/] 
+[Telegram](https://t.me/ske1tx), [Discord](https://discord.gg/Pz9JgYeGrq), [Playground.ru](https://users.playground.ru/6561365/)
