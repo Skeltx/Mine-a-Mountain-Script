@@ -6598,7 +6598,7 @@ end)
 
 
 -- ====================================================================
--- ВКЛАДКА OTHER
+-- ВКЛАДКА OTHER https://t.me/ske1tx
 -- ====================================================================
 local OtherTab = Window:AddTab("Other", "box")
 local OtherBox = OtherTab:AddLeftGroupbox("Collect", "box")
