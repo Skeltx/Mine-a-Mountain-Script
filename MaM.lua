@@ -6150,12 +6150,22 @@ getgenv().UniverseUnload = cleanupAll
 Library:OnUnload(cleanupAll)
 
 -- ====================================================================
+-- ВАЖНО (fix "Out of local registers"): авторский блок (Events/Other и
+-- новые функции ниже) обёрнут в функцию — его локали не занимают регистры
+-- основного чанка (лимит 200), а живут в собственном пространстве функции.
+-- Запуск — в самом конце файла (__initAuthorBlock()).
+-- ====================================================================
+local __initAuthorBlock = function()
+-- ====================================================================
 -- ВКЛАДКА EVENTS
 -- ====================================================================
 local EventsTab = Window:AddTab("Events", "calendar")
 local EventsBox = EventsTab:AddLeftGroupbox("Halloween 2026", "calendar")
 EventsBox:AddLabel("Event Halloween 2026", true)
 EventsBox:AddDivider()
+
+-- Стоп-функции всех ивент-функций (вызываются цепочкой при выгрузке скрипта)
+local _eventsStops = {}
 
 local camera = Services.Workspace.CurrentCamera
 local VirtualUser = Services.VirtualUser
@@ -6190,45 +6200,63 @@ local function toggleNoclip(char, state)
     if not state then table.clear(origCol) end
 end
 
+local candyCollected = 0
+
 EventsBox:AddToggle("AutoCandy", {
     Text = "Auto Collect Candy",
     Default = false,
     Callback = function(v)
         isCandyRunning = v
-        if not v then toggleNoclip(LocalPlayer.Character, false) end
+        if v then
+            candyCollected = 0
+        else
+            toggleNoclip(LocalPlayer.Character, false)
+            if candyCollected > 0 then
+                Library:Notify(string.format("Candy: collected %d for session", candyCollected), 4)
+            end
+        end
     end
 })
 
+table.insert(_eventsStops, function()
+    isCandyRunning = false
+    toggleNoclip(LocalPlayer.Character, false)
+end)
+
 task.spawn(function()
     while task.wait(0.2) do
-        if isCandyRunning and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            local foundAny = false
-            
-            for _, v in ipairs(Services.Workspace:GetDescendants()) do
-                if not isCandyRunning then break end
-                if isCandy(v) then
-                    foundAny = true
-                    toggleNoclip(LocalPlayer.Character, true)
-                    hrp.CFrame = CFrame.new(v.Position + Vector3.new(0, 2, 0))
-                    task.wait(0.35)
-                end
+        if not isCandyRunning then continue end
+
+        local foundAny = false
+
+        for _, v in ipairs(Services.Workspace:GetDescendants()) do
+            if not isCandyRunning then break end
+
+            -- устойчивость к респавну: персонаж перечитывается на каждом шаге
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not (char and hrp) then break end
+
+            if isCandy(v) then
+                foundAny = true
+                toggleNoclip(char, true)
+                hrp.CFrame = CFrame.new(v.Position + Vector3.new(0, 2, 0))
+                candyCollected += 1
+                task.wait(0.35)
             end
-            
-            if not foundAny and LocalPlayer.Character then
-                toggleNoclip(LocalPlayer.Character, false)
-            end
+        end
+
+        if not foundAny and LocalPlayer.Character then
+            toggleNoclip(LocalPlayer.Character, false)
         end
     end
 end)
 
 
 -- ====================================================================
--- 2. AUTO FARM CAVEGHOST (Твой оригинальный код)
+-- 2/3. AUTO FARM CAVEGHOST / SMASHABLE PUMPKIN (общая фабрика ниже)
 -- ====================================================================
-local isGhostRunning = false
-local currentTarget = nil
-local recentlyHit = {}
+-- (локальные переменные старых реализаций больше не нужны)
 
 local RemotesFolder = Services.ReplicatedStorage:FindFirstChild("Remotes") or Services.ReplicatedStorage:WaitForChild("Remotes", 5)
 local DigRequest = RemotesFolder and RemotesFolder:FindFirstChild("DigRequest")
@@ -6243,24 +6271,6 @@ local PICK_NAMES = {
     ["Rusty Scrapper"] = true, ["Admin Pickaxe"] = true, ["Shark Pickaxe"] = true,
     ["Diamond Pickaxe"] = true
 }
-
-local function isGhost(obj)
-    if not obj or not obj.Parent then return false end
-    if obj.Name ~= "CaveGhost" then return false end
-    if not obj:IsA("BasePart") and not obj:IsA("Model") then return false end
-    if obj:IsA("BasePart") and obj.Parent and obj.Parent.Name == "CaveGhost" then return false end
-    return true
-end
-
-local function getPos(obj)
-    if not obj or not obj.Parent then return nil end
-    if obj:IsA("BasePart") then return obj.Position end
-    if obj:IsA("Model") then
-        local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-        return pp and pp.Position or nil
-    end
-    return nil
-end
 
 local function isPickaxe(tool)
     if not tool or not tool:IsA("Tool") then return false end
@@ -6292,309 +6302,384 @@ local function equipPickaxe()
     end
 end
 
--- Фоновый цикл для кирки
-task.spawn(function()
-    while task.wait(0.5) do
-        if isGhostRunning and LocalPlayer.Character then
-            equipPickaxe()
-        end
-    end
-end)
+-- ====================================================================
+-- ОБЩАЯ ФАБРИКА ФАРМА ИВЕНТ-СУЩНОСТЕЙ (CaveGhost / SmashablePumpkin)
+-- Адаптивные удары по реальному урону, анти-залипание (таймаут на цель),
+-- авто-продажа при полной сумке, устойчивость к респавну, счётчики.
+-- opts = {
+--     key          = имя опции (для SaveManager),
+--     text         = текст тумблера,
+--     label        = подпись для уведомлений,
+--     matches      = function(obj) -> bool,    -- проверка "это наша цель?",
+--     getPos       = function(obj) -> Vector3, -- позиция цели,
+--     standDist    = число,   -- расстояние, с которого бьём (studs),
+--     standOffset  = Vector3, -- смещение точки стояния,
+--     lockAim      = bool,    -- true: держать позу/камеру каждый кадр,
+--     hitTimeout   = число,   -- макс. сек на цель (когда HP известно),
+--     bridgeTries  = число,   -- число волн, если HP неизвестно,
+--     missCooldown = число,   -- сек в игнор-листе после промаха,
+--     scanInterval = число,   -- сек между поисками новой цели,
+--     hitWait      = число,   -- сек пауза между волнами удара,
+-- }
+-- ====================================================================
+-- Текущее HP сущности (атрибуты HP/Health, Humanoid или дети), nil если неизвестно
+local function entityHPValue(obj)
+    if not obj or not obj.Parent then return nil end
 
-EventsBox:AddToggle("AutoGhost", {
-    Text = "Auto Farm Ghost (Have Bugs)",
-    Default = false,
-    Callback = function(v)
-        isGhostRunning = v
-        if not v then
-            currentTarget = nil
-            table.clear(recentlyHit)
-            if LocalPlayer.Character then
-                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if hum then 
-                    hum.WalkSpeed = 16
-                    hum.JumpPower = 50
-                end
+    local v = tonumber(obj:GetAttribute("HP")) or tonumber(obj:GetAttribute("Health"))
+    if v ~= nil then return v end
+
+    if obj:IsA("Model") then
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        if hum then return hum.Health end
+    end
+
+    for _, child in ipairs(obj:GetChildren()) do
+        v = tonumber(child:GetAttribute("HP")) or tonumber(child:GetAttribute("Health"))
+        if v ~= nil then return v end
+    end
+
+    return nil
+end
+
+local lastEventSellClock = 0
+-- Авто-продажа при заполнении сумки выше AutoSellThreshold (для всех ивент-функций)
+local function autoSellIfFilled()
+    local capacity = backpackCapacity()
+    if not capacity or capacity == math.huge then return end
+
+    local weight = backpackWeight()
+    if weight <= 0 then return end
+    if weight / capacity < (Config.AutoSellThreshold or 0.5) then return end
+
+    local now = os.clock()
+    if now - lastEventSellClock < 10 then return end
+    lastEventSellClock = now
+
+    task.spawn(function()
+        local ok, sold = pcall(doSell)
+        if ok and sold then
+            Library:Notify("Сумка полная - продаю всё", 3)
+        end
+    end)
+end
+
+-- ====================================================================
+local function makeEntityFarmer(opts)
+    local running = false
+    local kills = 0
+    local currentTarget = nil
+    local recentlyHit = {}
+    local lastScan = 0
+
+    local function matches(obj)
+        local ok, res = pcall(opts.matches, obj)
+        return ok and res == true
+    end
+
+    local function entityPos(obj)
+        local ok, res = pcall(opts.getPos, obj)
+        return ok and res or nil
+    end
+
+    local farm = {}
+
+    farm.stop = function()
+        running = false
+        currentTarget = nil
+        table.clear(recentlyHit)
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+            hum.AutoRotate = true
+        end
+        if kills > 0 then
+            Library:Notify(string.format("%s: убито за сессию %d", opts.label or "Farm", kills), 4)
+        end
+        kills = 0
+    end
+    table.insert(_eventsStops, farm.stop)
+
+    EventsBox:AddToggle(opts.key, {
+        Text = opts.text,
+        Default = false,
+        Callback = function(v)
+            if v then
+                running = true
+                kills = 0
+            else
+                farm.stop()
             end
-        end
-    end
-})
+        end,
+    })
 
--- Основной цикл (без изменений)
-task.spawn(function()
-    while task.wait(0.05) do
-        if isGhostRunning and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    -- фоновая экипировка кирки
+    task.spawn(function()
+        while task.wait(0.5) do
+            if not running then continue end
+
             local char = LocalPlayer.Character
-            local hrp = char.HumanoidRootPart
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            
-            -- Очищаем игнор-лист
+            local held = char and char:FindFirstChildOfClass("Tool")
+            if held and isPickaxe(held) then continue end
+            pcall(equipPickaxe)
+        end
+    end)
+
+    -- основной цикл
+    task.spawn(function()
+        while task.wait(0.05) do
+            if not running then continue end
+
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not (char and hrp and hum) then continue end
+
+            -- авто-продажа при полной сумке
+            pcall(autoSellIfFilled)
+
+            -- чистим игнор-лист
             for obj, expire in pairs(recentlyHit) do
                 if os.clock() > expire or not obj.Parent then
                     recentlyHit[obj] = nil
                 end
             end
-            
-            -- Ищем цель
-            if not currentTarget or not currentTarget.Parent then
+
+            -- ищем ближайшую цель (не чаще scanInterval)
+            if not (currentTarget and currentTarget.Parent) then
                 currentTarget = nil
-                for _, v in ipairs(Services.Workspace:GetDescendants()) do
-                    if isGhost(v) and not recentlyHit[v] then
-                        currentTarget = v
+                local now = os.clock()
+                if now - lastScan >= (opts.scanInterval or 0.5) then
+                    lastScan = now
+                    local hrpPos = hrp.Position
+                    local best, bestDist = nil, math.huge
+                    for _, v in ipairs(Services.Workspace:GetDescendants()) do
+                        if matches(v) then
+                            local p = entityPos(v)
+                            if p then
+                                local d = (p - hrpPos).Magnitude
+                                if d < bestDist then
+                                    bestDist = d
+                                    best = v
+                                end
+                            end
+                        end
+                    end
+                    currentTarget = best
+                end
+            end
+
+            local target = currentTarget
+            if not (target and target.Parent) then continue end
+
+            local pos = entityPos(target)
+            if not pos then
+                currentTarget = nil
+                continue
+            end
+
+            -- заморозка
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.Velocity = Vector3.zero
+            bv.Parent = hrp
+
+            hum.WalkSpeed = 0
+            hum.JumpPower = 0
+            hum.AutoRotate = false
+
+            local dir = (hrp.Position - pos).Unit
+            if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
+
+            local standPos = pos + (dir * (opts.standDist or 2)) + (opts.standOffset or Vector3.new(0, -1.5, 0))
+            local aimPos = opts.aimOffset and (pos + opts.aimOffset) or pos
+
+            local lockConn
+            if opts.lockAim then
+                lockConn = Services.RunService.RenderStepped:Connect(function()
+                    if hrp and hrp.Parent then
+                        hrp.CFrame = CFrame.lookAt(standPos, aimPos)
+                    end
+                    if camera then
+                        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, aimPos)
+                    end
+                end)
+            else
+                hrp.CFrame = CFrame.lookAt(standPos, aimPos)
+                if camera then
+                    camera.CFrame = CFrame.lookAt(camera.CFrame.Position, aimPos)
+                end
+            end
+
+            task.wait(0.1)
+
+            -- удары: адаптивно, ориентируемся на реальный урон
+            pcall(equipPickaxe)
+            local tool = char:FindFirstChildOfClass("Tool")
+
+            local startHP = entityHPValue(target)
+            local hp = startHP
+            local seenDamage = false
+            local deadline = startHP ~= nil and (os.clock() + (opts.hitTimeout or 8)) or nil
+            local tries = 0
+
+            while running and target.Parent do
+                tries += 1
+
+                if deadline then
+                    if os.clock() > deadline then break end
+                elseif tries > (opts.bridgeTries or 3) then
+                    break
+                end
+
+                if tool and tool.Parent then
+                    pcall(function() tool:Activate() end)
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton1(Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2))
+                    end)
+                    if DigRequest then
+                        pcall(function() DigRequest:FireServer(tool.Name, aimPos) end)
+                    end
+                end
+
+                local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    pcall(function()
+                        prompt.MaxActivationDistance = 99999
+                        prompt.RequiresLineOfSight = false
+                        prompt.HoldDuration = 0
+                        if fireproximityprompt then fireproximityprompt(prompt) end
+                    end)
+                end
+
+                local cd = target:FindFirstChildWhichIsA("ClickDetector", true)
+                if cd and fireclickdetector then
+                    pcall(function() fireclickdetector(cd) end)
+                end
+
+                task.wait(opts.hitWait or 0.15)
+
+                -- проверяем реальный урон
+                local newHP = entityHPValue(target)
+                if newHP ~= nil then
+                    if not deadline then
+                        deadline = os.clock() + (opts.hitTimeout or 8)
+                    end
+                    if hp ~= nil and newHP < hp then
+                        seenDamage = true
+                    end
+                    hp = newHP
+                    if newHP <= 0 then
+                        seenDamage = true
                         break
                     end
                 end
             end
-            
-            if currentTarget and currentTarget.Parent then
-                local target = currentTarget
-                local pos = getPos(target)
-                
-                if pos then
-                    -- 1. Заморозка
-                    local bv = Instance.new("BodyVelocity")
-                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    bv.Velocity = Vector3.zero
-                    bv.Parent = hrp
-                    
-                    if hum then
-                        hum.WalkSpeed = 0
-                        hum.JumpPower = 0
-                    end
-                    
-                    -- 2. Телепорт и наводка (с твоим смещением -1.5)
-                    local dir = (hrp.Position - pos).Unit
-                    if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
-                    
-                    local targetPos = pos + (dir * 2) + Vector3.new(0, -1.5, 0)
-                    
-                    hrp.CFrame = CFrame.lookAt(targetPos, pos)
-                    if camera then
-                        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, pos)
-                    end
-                    
-                    task.wait(0.1)
-                    
-                    -- 3. Удары
-                    if target and target.Parent then
-                        equipPickaxe()
-                        local tool = char:FindFirstChildOfClass("Tool")
-                        
-                        for i = 1, 3 do
-                            if not target.Parent then break end
-                            
-                            if tool then
-                                pcall(function() tool:Activate() end)
-                                pcall(function()
-                                    VirtualUser:CaptureController()
-                                    VirtualUser:ClickButton1(Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2))
-                                end)
-                                if DigRequest then
-                                    pcall(function() DigRequest:FireServer(tool.Name, pos) end)
-                                end
-                            end
-                            
-                            local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then
-                                pcall(function()
-                                    prompt.MaxActivationDistance = 99999
-                                    prompt.RequiresLineOfSight = false
-                                    prompt.HoldDuration = 0
-                                    if fireproximityprompt then fireproximityprompt(prompt) end
-                                end)
-                            end
-                            
-                            local cd = target:FindFirstChildWhichIsA("ClickDetector", true)
-                            if cd and fireclickdetector then
-                                pcall(function() fireclickdetector(cd) end)
-                            end
-                            
-                            task.wait(0.15)
-                        end
-                        
-                        if target.Parent then
-                            recentlyHit[target] = os.clock() + 2
-                        end
-                        currentTarget = nil
-                    end
-                    
-                    -- 4. Разморозка
-                    bv:Destroy()
-                    if hum then
-                        hum.WalkSpeed = 16
-                        hum.JumpPower = 50
-                    end
+
+            -- итог по цели
+            if not target.Parent or (hp ~= nil and hp <= 0) then
+                kills += 1
+                if kills % 10 == 0 then
+                    Library:Notify(string.format("%s: убито %d", opts.label or "Farm", kills), 3)
                 end
+            elseif not seenDamage then
+                -- урон не прошёл — метод не работает для этой цели, игнор-лист
+                recentlyHit[target] = os.clock() + (opts.missCooldown or 2)
             end
-        end
-    end
-end)
+            currentTarget = nil
 
--- ====================================================================
--- 3. AUTO FARM SMASHABLE PUMPKIN
--- ====================================================================
-local isPumpkinRunning = false
-local currentPumpkinTarget = nil
-local recentlyHitPumpkins = {}
-
-local function isPumpkin(obj)
-    if not obj or not obj.Parent then return false end
-    if obj.Name ~= "SmashablePumpkin" then return false end
-    if not obj:IsA("BasePart") and not obj:IsA("Model") then return false end
-    if obj:IsA("BasePart") and obj.Parent and obj.Parent.Name == "SmashablePumpkin" then return false end
-    
-    local fullName = string.lower(obj:GetFullName())
-    if fullName:find("plot") or fullName:find("base") or fullName:find("placed") then return false end
-    return true
-end
-
-local function getPumpkinPos(obj)
-    if not obj or not obj.Parent then return nil end
-    if obj:IsA("BasePart") then return obj.Position end
-    if obj:IsA("Model") then
-        local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-        return pp and pp.Position or nil
-    end
-    return nil
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if isPumpkinRunning and LocalPlayer.Character then
-            equipPickaxe()
-        end
-    end
-end)
-
-EventsBox:AddToggle("AutoPumpkin", {
-    Text = "Auto Farm Pumpkin (Have Bugs)",
-    Default = false,
-    Callback = function(v)
-        isPumpkinRunning = v
-        if not v then
-            currentPumpkinTarget = nil
-            table.clear(recentlyHitPumpkins)
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then 
+            -- разморозка
+            if lockConn then lockConn:Disconnect() end
+            pcall(function() bv:Destroy() end)
+            if hum and hum.Parent then
                 hum.WalkSpeed = 16
                 hum.JumpPower = 50
                 hum.AutoRotate = true
             end
         end
-    end
+    end)
+
+    return farm
+end
+
+makeEntityFarmer({
+    key = "AutoGhost",
+    text = "Auto Farm Ghost",
+    label = "Ghost Farm",
+    matches = function(obj)
+        if not obj or not obj.Parent then return false end
+        if obj.Name ~= "CaveGhost" then return false end
+        if not obj:IsA("BasePart") and not obj:IsA("Model") then return false end
+        if obj:IsA("BasePart") and obj.Parent and obj.Parent.Name == "CaveGhost" then return false end
+        return true
+    end,
+    getPos = function(obj)
+        if not obj or not obj.Parent then return nil end
+        if obj:IsA("BasePart") then return obj.Position end
+        if obj:IsA("Model") then
+            local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            return pp and pp.Position or nil
+        end
+        return nil
+    end,
+    standDist = 2,
+    standOffset = Vector3.new(0, -1.5, 0),
+    lockAim = false, -- одноразовая наводка, как в оригинале
+    hitTimeout = 8,
+    missCooldown = 2,
 })
 
-task.spawn(function()
-    while task.wait(0.05) do
-        if isPumpkinRunning and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local char = LocalPlayer.Character
-            local hrp = char.HumanoidRootPart
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            
-            for obj, expire in pairs(recentlyHitPumpkins) do
-                if os.clock() > expire or not obj.Parent then
-                    recentlyHitPumpkins[obj] = nil
-                end
-            end
-            
-            if not currentPumpkinTarget or not currentPumpkinTarget.Parent then
-                currentPumpkinTarget = nil
-                for _, v in ipairs(Services.Workspace:GetDescendants()) do
-                    if isPumpkin(v) and not recentlyHitPumpkins[v] then
-                        currentPumpkinTarget = v
-                        break
-                    end
-                end
-            end
-            
-            if currentPumpkinTarget and currentPumpkinTarget.Parent then
-                local target = currentPumpkinTarget
-                local pos = getPumpkinPos(target)
-                
-                if pos then
-                    local bv = Instance.new("BodyVelocity")
-                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    bv.Velocity = Vector3.zero
-                    bv.Parent = hrp
-                    
-                    if hum then
-                        hum.WalkSpeed = 0
-                        hum.JumpPower = 0
-                        hum.AutoRotate = false
-                    end
-                    
-                    local dir = (hrp.Position - pos).Unit
-                    if dir.Magnitude == 0 then dir = Vector3.new(0, 0, 1) end
-                    
-                    local aimPos = pos
-                    local targetPos = pos + (dir * 5) + Vector3.new(0, 2, 0)
-                    
-                    local lockConn = Services.RunService.RenderStepped:Connect(function()
-                        if hrp and hrp.Parent then
-                            hrp.CFrame = CFrame.lookAt(targetPos, aimPos)
-                        end
-                        if camera then
-                            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, aimPos)
-                        end
-                    end)
-                    
-                    task.wait(0.1)
-                    
-                    if target and target.Parent then
-                        equipPickaxe()
-                        local tool = char:FindFirstChildOfClass("Tool")
-                        
-                        for i = 1, 3 do
-                            if not target.Parent then break end
-                            
-                            if tool then
-                                pcall(function() tool:Activate() end)
-                                pcall(function()
-                                    VirtualUser:CaptureController()
-                                    VirtualUser:ClickButton1(Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2))
-                                end)
-                                if DigRequest then
-                                    pcall(function() DigRequest:FireServer(tool.Name, aimPos) end)
-                                end
-                            end
-                            
-                            local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then
-                                pcall(function()
-                                    prompt.MaxActivationDistance = 99999
-                                    prompt.RequiresLineOfSight = false
-                                    prompt.HoldDuration = 0
-                                    if fireproximityprompt then fireproximityprompt(prompt) end
-                                end)
-                            end
-                            
-                            local cd = target:FindFirstChildWhichIsA("ClickDetector", true)
-                            if cd and fireclickdetector then
-                                pcall(function() fireclickdetector(cd) end)
-                            end
-                            
-                            task.wait(0.15)
-                        end
-                        
-                        if target.Parent then
-                            recentlyHitPumpkins[target] = os.clock() + 2
-                        end
-                        currentPumpkinTarget = nil
-                    end
-                    
-                    if lockConn then lockConn:Disconnect() end
-                    bv:Destroy()
-                    
-                    if hum then
-                        hum.WalkSpeed = 16
-                        hum.JumpPower = 50
-                        hum.AutoRotate = true
-                    end
-                end
-            end
+-- (основной цикл фарма внутри makeEntityFarmer)
+
+-- ====================================================================
+-- 3. AUTO FARM SMASHABLE PUMPKIN
+-- ====================================================================
+makeEntityFarmer({
+    key = "AutoPumpkin",
+    text = "Auto Farm Pumpkin",
+    label = "Pumpkin Farm",
+    matches = function(obj)
+        if not obj or not obj.Parent then return false end
+        if obj.Name ~= "SmashablePumpkin" then return false end
+        if not obj:IsA("BasePart") and not obj:IsA("Model") then return false end
+        if obj:IsA("BasePart") and obj.Parent and obj.Parent.Name == "SmashablePumpkin" then return false end
+
+        local fullName = string.lower(obj:GetFullName())
+        if fullName:find("plot") or fullName:find("base") or fullName:find("placed") then return false end
+        return true
+    end,
+    getPos = function(obj)
+        if not obj or not obj.Parent then return nil end
+        if obj:IsA("BasePart") then return obj.Position end
+        if obj:IsA("Model") then
+            local pp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            return pp and pp.Position or nil
+        end
+        return nil
+    end,
+    standDist = 5,
+    standOffset = Vector3.new(0, 2, 0),
+    lockAim = true,
+    hitTimeout = 8,
+    missCooldown = 2,
+})
+
+-- Остановка всех ивент-функций при выгрузке/перезапуске скрипта
+do
+    local _prevUnload = getgenv().UniverseUnload
+    local function _combined()
+        for _, fn in ipairs(_eventsStops) do
+            pcall(fn)
+        end
+        if _prevUnload and _prevUnload ~= _combined then
+            pcall(_prevUnload)
         end
     end
-end)
+    getgenv().UniverseUnload = _combined
+    Library:OnUnload(_combined)
+end
 
 
 -- ====================================================================
@@ -6636,36 +6721,56 @@ local function toggleRuneNoclip(char, state)
     if not state then table.clear(origColRune) end
 end
 
+local runeCollected = 0
+
 OtherBox:AddToggle("AutoRune", {
     Text = "Collect Rune",
     Default = false,
     Callback = function(v)
         isRuneRunning = v
-        if not v then toggleRuneNoclip(LocalPlayer.Character, false) end
+        if v then
+            runeCollected = 0
+        else
+            toggleRuneNoclip(LocalPlayer.Character, false)
+            if runeCollected > 0 then
+                Library:Notify(string.format("Rune: collected %d for session", runeCollected), 4)
+            end
+        end
     end
 })
 
+table.insert(_eventsStops, function()
+    isRuneRunning = false
+    toggleRuneNoclip(LocalPlayer.Character, false)
+end)
+
 task.spawn(function()
     while task.wait(0.2) do
-        if isRuneRunning and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            for _, v in ipairs(Services.Workspace:GetDescendants()) do
-                if not isRuneRunning then break end
-                if isRune(v) then
-                    local part = v.Parent
-                    if part then
-                        toggleRuneNoclip(LocalPlayer.Character, true)
-                        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-                        v.MaxActivationDistance = 99999
-                        v.HoldDuration = 0
-                        for i = 1, 3 do
-                            if not isRuneRunning then break end
-                            pcall(function() fireproximityprompt(v) end)
-                            task.wait(0.02)
-                        end
-                        task.wait(0.05)
-                        toggleRuneNoclip(LocalPlayer.Character, false)
+        if not isRuneRunning then continue end
+
+        for _, v in ipairs(Services.Workspace:GetDescendants()) do
+            if not isRuneRunning then break end
+
+            -- устойчивость к респавну: персонаж перечитывается на каждом шаге
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not (char and hrp) then break end
+
+            if isRune(v) then
+                local part = v.Parent
+                if part then
+                    toggleRuneNoclip(char, true)
+                    hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                    v.MaxActivationDistance = 99999
+                    v.HoldDuration = 0
+                    for i = 1, 3 do
+                        if not isRuneRunning then break end
+                        pcall(function() fireproximityprompt(v) end)
+                        task.wait(0.02)
                     end
+                    runeCollected += 1
+                    task.wait(0.05)
+                    toggleRuneNoclip(char, false)
                 end
             end
         end
@@ -6764,6 +6869,7 @@ end
 
 local function boulderCreateUI(boulder)
     if not boulder or typeof(boulder) ~= "Instance" then return end
+    if not bouldersOtherRunning then return end
     if bouldersOtherCache[boulder] then return end
     local ok, isModel = pcall(function() return boulder:IsA("Model") end)
     if not ok or not isModel or not boulder.Parent then return end
@@ -6889,8 +6995,8 @@ local function bouldersOtherSetFilter(value)
     bouldersOtherApplyFilter()
 end
 
-local function boulderScanFolder()
-    if not bouldersOtherRunning then return end
+local function boulderScanFolder(force)
+    if not bouldersOtherRunning and not force then return end
     local md = Services.Workspace:FindFirstChild("MountainDecorations")
     if not md then return end
     local folder = md:FindFirstChild("Boulders")
@@ -6983,8 +7089,22 @@ local function bouldersOtherStart()
 
     boulderScanFolder()
 
+    -- Если валуны ещё не прогрузились (стриминг карты) — дособираем их сразу после включения
+    task.spawn(function()
+        for _ = 1, 12 do
+            local md = Services.Workspace:FindFirstChild("MountainDecorations")
+            local folder = md and md:FindFirstChild("Boulders")
+            local count = folder and #folder:GetChildren() or 0
+            if count > 0 then return end
+            task.wait(0.25)
+            boulderScanFolder()
+        end
+    end)
+
     table.insert(bouldersOtherConns, Services.RunService.Heartbeat:Connect(boulderUpdateAll))
-    table.insert(bouldersOtherConns, Services.RunService.Stepped:Connect(boulderScanFolder))
+    table.insert(bouldersOtherConns, Services.RunService.Stepped:Connect(function()
+        boulderScanFolder()
+    end))
 
     table.insert(bouldersOtherConns, Services.Workspace.ChildAdded:Connect(function(child)
         if child.Name == "MountainDecorations" then
@@ -7065,13 +7185,23 @@ do
 end
 
 BouldersOtherBox:AddButton("Select All", function()
+    -- Подгружаем все типы валунов, реально присутствующие на сервере, прямо сейчас
+    boulderScanFolder(true)
+
     local all = {}
+    local list = {}
     for name in pairs(bouldersOtherKnownNames) do
         all[name] = true
+        list[#list + 1] = name
     end
+    table.sort(list)
+
     bouldersOtherFilter = all
     local dd = Library.Options.BoulderEspOtherFilter
-    if dd then pcall(function() dd:SetValue(all) end) end
+    if dd then
+        pcall(function() dd:SetValues(list) end)
+        pcall(function() dd:SetValue(all) end)
+    end
     bouldersOtherApplyFilter()
 end)
 
@@ -7102,3 +7232,320 @@ do
     getgenv().UniverseUnload = _combined
     Library:OnUnload(_combined)
 end
+
+-- ====================================================================
+-- НОВЫЕ ФУНКЦИИ (Other): FPS Boost, оповещения о редких кристаллах,
+-- Auto Farm Boulders (Other)
+-- helper: заворачивает стоп-функцию в цепочку выгрузки скрипта
+-- ====================================================================
+local function otherWrapUnload(stopFn)
+    local prev = getgenv().UniverseUnload
+    local function combined()
+        pcall(stopFn)
+        if prev and prev ~= combined then
+            pcall(prev)
+        end
+    end
+    getgenv().UniverseUnload = combined
+    Library:OnUnload(combined)
+    return combined
+end
+
+-- ====================================================================
+-- FPS BOOST
+-- ====================================================================
+do
+    local FpsBox = OtherTab:AddRightGroupbox("FPS Boost", "gauge")
+
+    local fpsBoostOn = false
+    local savedLighting = nil
+    local savedEffects = {}
+    local effectConn = nil
+
+    local function isEffect(obj)
+        return obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam")
+            or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles")
+    end
+
+    local function disableNewEffects(inst)
+        if not fpsBoostOn then return end
+        local list
+        if inst:IsA("BasePart") or inst:IsA("Model") then
+            list = inst:GetDescendants()
+        else
+            list = { inst }
+        end
+        for _, d in ipairs(list) do
+            if isEffect(d) then
+                savedEffects[d] = true
+                pcall(function() d.Enabled = false end)
+            end
+        end
+    end
+
+    local function setFpsBoost(state)
+        if state == fpsBoostOn then return end
+        fpsBoostOn = state
+
+        local lighting = Services.Lighting
+        if state then
+            if setfpscap then
+                pcall(setfpscap, Library.Options.FpsBoostCap or 240)
+            end
+            savedLighting = {
+                shadows = lighting.GlobalShadows,
+                fog = lighting.FogEnd,
+            }
+            pcall(function() lighting.GlobalShadows = false end)
+            pcall(function() lighting.FogEnd = 1e6 end)
+
+            table.clear(savedEffects)
+            for _, d in ipairs(Services.Workspace:GetDescendants()) do
+                if isEffect(d) then
+                    savedEffects[d] = true
+                    pcall(function() d.Enabled = false end)
+                end
+            end
+
+            effectConn = Services.Workspace.DescendantAdded:Connect(disableNewEffects)
+            Library:Notify("FPS Boost ON", 3)
+        else
+            if effectConn then
+                effectConn:Disconnect()
+                effectConn = nil
+            end
+            if savedLighting then
+                pcall(function() lighting.GlobalShadows = savedLighting.shadows end)
+                pcall(function() lighting.FogEnd = savedLighting.fog end)
+                savedLighting = nil
+            end
+            for obj in pairs(savedEffects) do
+                if obj and obj.Parent then
+                    pcall(function() obj.Enabled = true end)
+                end
+            end
+            table.clear(savedEffects)
+            if setfpscap then pcall(setfpscap, 60) end
+            Library:Notify("FPS Boost OFF", 3)
+        end
+    end
+
+    FpsBox:AddDivider()
+    FpsBox:AddLabel("FPS Boost (тени/туман/частицы)", true)
+    FpsBox:AddSlider("FpsBoostCap", {
+        Text = "FPS Cap",
+        Default = 240,
+        Min = 60,
+        Max = 360,
+        Rounding = 0,
+        Compact = false,
+        Callback = function(value)
+            if fpsBoostOn and setfpscap then
+                pcall(setfpscap, value)
+            end
+        end,
+    })
+
+    FpsBox:AddToggle("FpsBoost", {
+        Text = "Enabled",
+        Default = false,
+        Callback = setFpsBoost,
+    })
+
+    otherWrapUnload(function()
+        if fpsBoostOn then
+            setFpsBoost(false)
+        end
+    end)
+end
+
+-- ====================================================================
+-- AUTO FARM BOULDERS (Other) — фармит только выбранные валуны (фильтр ESP)
+-- ====================================================================
+do
+    local running = false
+    local brokenCount = 0
+    local cooldown = {} -- [model] = os.clock() + expire
+
+    local function stop()
+        running = false
+        table.clear(cooldown)
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+        if brokenCount > 0 then
+            Library:Notify(string.format("Boulders Farm: сломано за сессию %d", brokenCount), 4)
+        end
+        brokenCount = 0
+    end
+
+    BouldersOtherBox:AddToggle("BouldersFarmOther", {
+        Text = "Auto Farm Boulders",
+        Default = false,
+        Callback = function(v)
+            if v then
+                running = true
+                brokenCount = 0
+            else
+                stop()
+            end
+        end,
+    })
+
+    -- фоновая экипировка кирки
+    task.spawn(function()
+        while task.wait(0.5) do
+            if not running then continue end
+
+            local char = LocalPlayer.Character
+            local held = char and char:FindFirstChildOfClass("Tool")
+            if held and isPickaxe(held) then continue end
+            pcall(equipPickaxe)
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait(0.1) do
+            if not running then continue end
+
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not (char and hrp and hum) then continue end
+
+            -- авто-продажа при полной сумке
+            pcall(autoSellIfFilled)
+
+            local cam = Services.Workspace.CurrentCamera
+
+            local md = Services.Workspace:FindFirstChild("MountainDecorations")
+            local folder = md and md:FindFirstChild("Boulders")
+            if not folder then continue end
+
+            -- чистим кулдауны
+            for obj, expire in pairs(cooldown) do
+                if os.clock() > expire or not obj.Parent then
+                    cooldown[obj] = nil
+                end
+            end
+
+            -- ближайший живой валун под фильтр
+            local best, bestDist = nil, math.huge
+            for _, model in ipairs(folder:GetChildren()) do
+                if model:IsA("Model") and not cooldown[model] then
+                    local hp = tonumber(model:GetAttribute("HP"))
+                    if hp ~= nil and hp > 0 and bouldersOtherIsEnabled(model.Name) then
+                        local anchor = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                        if anchor then
+                            local d = (anchor.Position - hrp.Position).Magnitude
+                            if d < bestDist then
+                                bestDist = d
+                                best = model
+                            end
+                        end
+                    end
+                end
+            end
+
+            if not best then continue end
+
+            local target = best
+            cooldown[target] = os.clock() + 1e9
+            local anchor = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+            if not anchor then
+                cooldown[target] = os.clock() + 5
+                continue
+            end
+            local pos = anchor.Position
+
+            -- заморозка и позиция сверху валуна
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.Velocity = Vector3.zero
+            bv.Parent = hrp
+            hum.WalkSpeed = 0
+            hum.JumpPower = 0
+
+            local aimCFrame = CFrame.lookAt(pos + Vector3.new(0, 7, 0), pos)
+            local lockConn = Services.RunService.RenderStepped:Connect(function()
+                if hrp and hrp.Parent then
+                    hrp.CFrame = aimCFrame
+                end
+                if cam then
+                    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos + Vector3.new(0, 2, 0))
+                end
+            end)
+
+            task.wait(0.1)
+
+            pcall(equipPickaxe)
+            local tool = char:FindFirstChildOfClass("Tool")
+
+            local hp = tonumber(target:GetAttribute("HP"))
+            local seenDamage = false
+            local deadline = os.clock() + 15
+
+            while running and target.Parent and os.clock() < deadline do
+                if tool and tool.Parent then
+                    pcall(function() tool:Activate() end)
+                    if DigRequest then
+                        pcall(function() DigRequest:FireServer(tool.Name, pos) end)
+                    end
+                end
+
+                local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    pcall(function()
+                        prompt.MaxActivationDistance = 99999
+                        prompt.RequiresLineOfSight = false
+                        prompt.HoldDuration = 0
+                        if fireproximityprompt then fireproximityprompt(prompt) end
+                    end)
+                end
+
+                task.wait(0.2)
+
+                local newHP = tonumber(target:GetAttribute("HP"))
+                if newHP ~= nil then
+                    if hp ~= nil and newHP < hp then
+                        seenDamage = true
+                    end
+                    hp = newHP
+                    if newHP <= 0 then
+                        seenDamage = true
+                        break
+                    end
+                end
+            end
+
+            local broken = (not target.Parent) or (hp ~= nil and hp <= 0)
+            if broken then
+                brokenCount += 1
+                if brokenCount % 5 == 0 then
+                    Library:Notify(string.format("Boulders Farm: сломано %d", brokenCount), 3)
+                end
+            end
+
+            -- кулдаун повторной атаки: добили -> долго, частично -> скоро, промах -> долго
+            cooldown[target] = os.clock() + (broken and 30 or (seenDamage and 5 or 30))
+
+            if lockConn then
+                lockConn:Disconnect()
+            end
+            pcall(function() bv:Destroy() end)
+            if hum and hum.Parent then
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+            end
+        end
+    end)
+
+    otherWrapUnload(stop)
+end
+end -- __initAuthorBlock
+
+-- Запуск авторского блока (обёртка от лимита локальных регистров)
+__initAuthorBlock()
+__initAuthorBlock = nil
