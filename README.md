@@ -5,6 +5,10 @@ Roblox Script for place Mine a Mountain.
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/Start.lua"))()
 ```
+Вариант для тестов:
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/Start_Test.lua"))()
+```
 Проверен на инжекторе Xeno. Не требует ключа.
 
 ### Описание
