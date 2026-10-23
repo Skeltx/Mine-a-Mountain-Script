@@ -753,18 +753,24 @@ end
 Connections.schedulerConn = Services.RunService.Heartbeat:Connect(function(deltaTime)
     if State.tpState then
         local ok, err = pcall(function()
-            if not applyPivot(State.tpState.goal) then
-                finishTeleport()
+            local fnPivot, fnFinish = E.applyPivot, E.finishTeleport
+            if not fnPivot or not fnFinish then
+                error("teleport core module not loaded yet")
+            end
+            if not fnPivot(State.tpState.goal) then
+                fnFinish()
                 return
             end
 
             if os.clock() >= State.tpState.holdUntil then
-                finishTeleport()
+                fnFinish()
             end
         end)
 
         if not ok then
-            finishTeleport()
+            if E.finishTeleport then
+                pcall(E.finishTeleport)
+            end
             reportError("teleport", err)
         end
     end
