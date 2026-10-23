@@ -3,7 +3,7 @@ Roblox Script for place Mine a Mountain.
 
 Чтобы не вставлять весь код в ваш инжектор, используйте эту ссылку:
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/refs/heads/main/MaM.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/Start.lua"))()
 ```
 Проверен на инжекторе Xeno. Не требует ключа.
 
