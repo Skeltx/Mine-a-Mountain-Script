@@ -560,3 +560,6 @@ do
     Library:OnUnload(_combined)
 end
 
+
+-- === Экспорт модуля ===
+E._eventsStops = _eventsStops

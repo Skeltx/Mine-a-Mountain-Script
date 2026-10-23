@@ -179,12 +179,13 @@ $fragments = [ordered]@{
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
         Ranges = @('6159-6682')
-        Exports = @()
+        Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
         Title = 'OTHER — вкладка Other (Collect Rune, Boulders ESP/Farm, FPS Boost)'
         Ranges = @('6685-7546')
         Exports = @()
+        LocalImports = @('_eventsStops')
     }
 }
 

@@ -34,6 +34,7 @@ local backpackFree = E.backpackFree
 local eachContainer = E.eachContainer
 local requestStream = E.requestStream
 local teleportTo = E.teleportTo
+local _eventsStops = E._eventsStops
 
 -- ====================================================================
 -- ВКЛАДКА OTHER https://t.me/ske1tx
