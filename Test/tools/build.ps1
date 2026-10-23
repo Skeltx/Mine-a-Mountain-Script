@@ -132,7 +132,7 @@ $fragments = [ordered]@{
     '10_esp.lua' = @{
         Title = 'ESP — движок ESP кристаллов/игроков + вкладка Crystals + Player ESP (UI)'
         Ranges = @('739-1326', '3185-3275')
-        Exports = @('clearRegistry','clearPlayerEsp','unwatchContainers')
+        Exports = @('clearRegistry','clearPlayerEsp','unwatchContainers','newLabel')
     }
     '15_net.lua' = @{
         Title = 'NET — серверный хоп/тёплый пул серверов, авто-rejoin'
@@ -142,12 +142,16 @@ $fragments = [ordered]@{
     '20_boulders.lua' = @{
         Title = 'BOULDERS — движок Mountain (копание валунов), aimTeleport, вкладка Boulders, Boulder Farm'
         Ranges = @('2074-2710', '3276-3309', '3801-4923')
-        Exports = @('Mountain','Farm','aimTeleport')
+        Exports = @('Mountain','Farm','aimTeleport','tpToRank','fireRemote','unfavoriteAll','mountainSpot','mountainSpan','getSellCFrame')
+        LocalImports = @('newLabel')
+        LazyImports = @('Move','crystalPrompt','firePrompt','sortedByScore')
     }
     '30_farm.lua' = @{
         Title = 'FARM — промпты/авто-сбор кристаллов, бэкпак, Auto Farm Crystal'
         Ranges = @('1487-1898', '3434-3464', '4924-5862', '5943-5947')
-        Exports = @('Money','restoreInstantPrompts')
+        Exports = @('Money','restoreInstantPrompts','crystalPrompt','firePrompt')
+        LocalImports = @('Mountain','Farm','fireRemote','unfavoriteAll','mountainSpot','mountainSpan')
+        LazyImports = @('Move')
     }
     '40_shop.lua' = @{
         Title = 'SHOP — Bomb Auto Buy (закупка бомб)'
@@ -158,6 +162,8 @@ $fragments = [ordered]@{
         Title = 'TELEPORTS — Top Crystals, Teleports (UI), обработка инпута (E/aim-TP)'
         Ranges = @('2037-2072', '3310-3433', '3509-3558')
         Exports = @()
+        LocalImports = @('tpToRank','fireRemote','unfavoriteAll','getSellCFrame')
+        LazyImports = @('Move','firePrompt')
     }
     '60_movement.lua' = @{
         Title = 'MOVEMENT — Speed/Noclip/InfJump/Fly + вкладка Movement'
@@ -168,6 +174,7 @@ $fragments = [ordered]@{
         Title = 'SETTINGS — SaveManager, ThemeManager, вкладка Settings, cleanupAll/unload'
         Ranges = @('5949-6157')
         Exports = @()
+        LocalImports = @('Mountain','Farm','Money','Net','Move','setSpeedBoost','restoreInstantPrompts','clearRegistry','clearPlayerEsp','unwatchContainers')
     }
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
@@ -228,6 +235,21 @@ foreach ($name in $fragments.Keys) {
                 continue
             }
             $header += "local $imp = E.$imp`n"
+        }
+        if ($f.LocalImports) {
+            foreach ($n in $f.LocalImports) {
+                $header += "local $n = E.$n`n"
+            }
+        }
+        if ($f.LazyImports) {
+            $header += "`n-- Lazy-импорты: имена другого модуля, который грузится ПОЗЖЕ текущего.`n"
+            foreach ($n in $f.LazyImports) {
+                if ($n -eq 'Move') {
+                    $header += "local Move = setmetatable({}, { __index = function(_, k) local m = E.Move; return (m and m[k]) or function() end end })`n"
+                } else {
+                    $header += "local function $n(...) local f = E.$n if not f then return nil end return f(...) end`n"
+                }
+            }
         }
         $parts.Add($header)
     }

@@ -73,6 +73,14 @@ local findClearGoal = E.findClearGoal
 local finishTeleport = E.finishTeleport
 local teleportTo = E.teleportTo
 local schedule = E.schedule
+local tpToRank = E.tpToRank
+local fireRemote = E.fireRemote
+local unfavoriteAll = E.unfavoriteAll
+local getSellCFrame = E.getSellCFrame
+
+-- Lazy-импорты: имена другого модуля, который грузится ПОЗЖЕ текущего.
+local Move = setmetatable({}, { __index = function(_, k) local m = E.Move; return (m and m[k]) or function() end end })
+local function firePrompt(...) local f = E.firePrompt if not f then return nil end return f(...) end
 
 local function sortedByScore(scoreFn)
     local scored = {}

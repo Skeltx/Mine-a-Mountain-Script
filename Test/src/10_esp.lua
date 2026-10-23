@@ -760,6 +760,7 @@ end
 E.clearRegistry = clearRegistry
 E.clearPlayerEsp = clearPlayerEsp
 E.unwatchContainers = unwatchContainers
+E.newLabel = newLabel
 
 -- === Регистрация тик-функций для центрального планировщика ===
 E.PlayerEspTick = updatePlayerEsp

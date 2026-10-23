@@ -73,6 +73,15 @@ local findClearGoal = E.findClearGoal
 local finishTeleport = E.finishTeleport
 local teleportTo = E.teleportTo
 local schedule = E.schedule
+local Mountain = E.Mountain
+local Farm = E.Farm
+local fireRemote = E.fireRemote
+local unfavoriteAll = E.unfavoriteAll
+local mountainSpot = E.mountainSpot
+local mountainSpan = E.mountainSpan
+
+-- Lazy-импорты: имена другого модуля, который грузится ПОЗЖЕ текущего.
+local Move = setmetatable({}, { __index = function(_, k) local m = E.Move; return (m and m[k]) or function() end end })
 
 local function crystalPrompt(inst)
     local cached = Storage.promptCache[inst]
@@ -1469,6 +1478,8 @@ end
 -- === Экспорт модуля ===
 E.Money = Money
 E.restoreInstantPrompts = restoreInstantPrompts
+E.crystalPrompt = crystalPrompt
+E.firePrompt = firePrompt
 
 -- === Регистрация тик-функций для центрального планировщика ===
 E.PickupTick = pickupStep

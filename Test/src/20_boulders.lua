@@ -73,6 +73,13 @@ local findClearGoal = E.findClearGoal
 local finishTeleport = E.finishTeleport
 local teleportTo = E.teleportTo
 local schedule = E.schedule
+local newLabel = E.newLabel
+
+-- Lazy-импорты: имена другого модуля, который грузится ПОЗЖЕ текущего.
+local Move = setmetatable({}, { __index = function(_, k) local m = E.Move; return (m and m[k]) or function() end end })
+local function crystalPrompt(...) local f = E.crystalPrompt if not f then return nil end return f(...) end
+local function firePrompt(...) local f = E.firePrompt if not f then return nil end return f(...) end
+local function sortedByScore(...) local f = E.sortedByScore if not f then return nil end return f(...) end
 
 local Mountain = {}
 
@@ -1876,3 +1883,9 @@ end
 E.Mountain = Mountain
 E.Farm = Farm
 E.aimTeleport = aimTeleport
+E.tpToRank = tpToRank
+E.fireRemote = fireRemote
+E.unfavoriteAll = unfavoriteAll
+E.mountainSpot = mountainSpot
+E.mountainSpan = mountainSpan
+E.getSellCFrame = getSellCFrame

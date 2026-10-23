@@ -73,6 +73,16 @@ local findClearGoal = E.findClearGoal
 local finishTeleport = E.finishTeleport
 local teleportTo = E.teleportTo
 local schedule = E.schedule
+local Mountain = E.Mountain
+local Farm = E.Farm
+local Money = E.Money
+local Net = E.Net
+local Move = E.Move
+local setSpeedBoost = E.setSpeedBoost
+local restoreInstantPrompts = E.restoreInstantPrompts
+local clearRegistry = E.clearRegistry
+local clearPlayerEsp = E.clearPlayerEsp
+local unwatchContainers = E.unwatchContainers
 
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
