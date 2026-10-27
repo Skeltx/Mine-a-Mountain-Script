@@ -18,6 +18,7 @@ local Remotes = E.Remotes
 local Library = E.Library
 local Window = E.Window
 local Tabs = E.Tabs
+local SettingsTab = E.SettingsTab
 local reportError = E.reportError
 local formatShort = E.formatShort
 local formatWeight = E.formatWeight

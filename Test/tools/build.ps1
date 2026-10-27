@@ -243,7 +243,7 @@ foreach ($name in $fragments.Keys) {
             if ($name -in @('80_events.lua','90_other.lua') -and $imp -in @(
                 'ESP','PLAYER','PACE','TP','PICK','COLORS','TIER_NAMES','LUCK','MUTATION_LUCK',
                 'WATCHED_ATTRIBUTES','SUFFIXES','PARSE_MULTIPLIERS','CONTAINER_NAMES','SaveManager',
-                'ThemeManager','SettingsTab','EspHolder','formatDistance','bindCharacter','getRoot',
+                'ThemeManager','EspHolder','formatDistance','bindCharacter','getRoot',
                 'getAttr','crystalTier','crystalRarity','mutationLuck','combinedLuckMult','computeLuck',
                 'luckLabel','luckLabelText','meetsFilter','ownsGamepass','realStat','hasActiveRune',
                 'looksLikeCrystal','isCrystal','rebuildContainers','applyPivot','findClearGoal',
