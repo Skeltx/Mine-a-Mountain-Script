@@ -55,12 +55,42 @@ local VirtualUser = Services.VirtualUser
 local isCandyRunning = false
 local origCol = {}
 
+-- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель),
+-- Anchored больше не отсеивает: конфеты-декорации под картой заякорены, их тоже собираем.
 local function isCandy(obj)
-    if not obj or not obj.Parent or not obj:IsA("BasePart") then return false end
-    if obj.Anchored then return false end
-    local n, p = string.lower(obj.Name), obj.Parent and string.lower(obj.Parent.Name) or ""
-    local f = string.lower(obj:GetFullName())
-    return (n:find("candy") or p:find("candy")) and not (f:find("plot") or f:find("base") or f:find("placed") or p:find("plot"))
+    if not obj or not obj.Parent then return false end
+    if not (obj:IsA("BasePart") or obj:IsA("Model")) then return false end
+
+    local hit = string.lower(obj.Name):find("candy") ~= nil
+    if not hit then
+        local p = obj.Parent
+        while p and p ~= Services.Workspace do
+            if string.lower(p.Name):find("candy") then
+                hit = true
+                break
+            end
+            p = p.Parent
+        end
+    end
+    if not hit then return false end
+
+    -- исключения: грядки/базы/установленное — проверяем по всей цепочке предков
+    local p2 = obj
+    while p2 and p2 ~= Services.Workspace do
+        local ln = string.lower(p2.Name)
+        if ln:find("plot") or ln:find("base") or ln:find("placed") then return false end
+        p2 = p2.Parent
+    end
+    return true
+end
+
+local function candyPos(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        local ok, pv = pcall(obj.GetPivot, obj)
+        if ok and pv then return pv.Position end
+    end
+    return nil
 end
 
 local function toggleNoclip(char, state)
@@ -97,6 +127,30 @@ EventsBox:AddToggle("AutoCandy", {
     end
 })
 
+-- Диагностика: один проход по Workspace, все объекты с "candy" в любом месте пути.
+-- Результат — в консоль (F9). Показывает, как называются конфеты и где лежат.
+EventsBox:AddButton("Candy Scan (debug)", function()
+    local ws = Services.Workspace
+    local count = 0
+    for _, v in ipairs(ws:GetDescendants()) do
+        local parts = {}
+        local p = v
+        while p and p ~= ws do
+            table.insert(parts, 1, p.Name)
+            p = p.Parent
+        end
+        local path = table.concat(parts, "/")
+        if string.lower(path):find("candy") then
+            count += 1
+            local anchored = "-"
+            if v:IsA("BasePart") then anchored = tostring(v.Anchored) end
+            print(string.format("[CandyScan] %s (%s) :: %s :: anchored=%s", v.Name, v.ClassName, path, anchored))
+        end
+    end
+    print(string.format("[CandyScan] всего: %d", count))
+    Library:Notify("Candy Scan: " .. count .. " совпадений, смотри консоль (F9)", 5)
+end)
+
 table.insert(_eventsStops, function()
     isCandyRunning = false
     toggleNoclip(LocalPlayer.Character, false)
@@ -117,9 +171,15 @@ task.spawn(function()
             if not (char and hrp) then break end
 
             if isCandy(v) then
+                -- одна конфета = один заход: деталь внутри модели-конфеты ждёт сама модель
+                if v:IsA("BasePart") and v.Parent and v.Parent:IsA("Model") and isCandy(v.Parent) then
+                    continue
+                end
+                local pos = candyPos(v)
+                if not pos then continue end
                 foundAny = true
                 toggleNoclip(char, true)
-                hrp.CFrame = CFrame.new(v.Position + Vector3.new(0, 2, 0))
+                hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
                 candyCollected += 1
                 task.wait(0.35)
             end
