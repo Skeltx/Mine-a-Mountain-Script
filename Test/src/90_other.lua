@@ -19,6 +19,8 @@ local Library = E.Library
 local Window = E.Window
 local Tabs = E.Tabs
 local SettingsTab = E.SettingsTab
+local EventsTab = E.EventsTab
+local OtherTab = E.OtherTab
 local reportError = E.reportError
 local formatShort = E.formatShort
 local formatWeight = E.formatWeight
@@ -40,7 +42,7 @@ local _eventsStops = E._eventsStops
 -- ====================================================================
 -- Collect Rune перенесён из вкладки Other во вкладку Farming (правый блок)
 -- ==================================================================== 
-local OtherBox = Tabs.farming:AddRightGroupbox("Collect Rune", "box")
+local OtherBox = Tabs.farming:AddLeftGroupbox("Collect Rune", "box")
 OtherBox:AddDivider()
 
 -- ↓↓↓ Collect Rune ↓↓↓
@@ -589,7 +591,7 @@ end
 -- FPS BOOST
 -- ====================================================================
 do
-    local FpsBox = SettingsTab:AddRightGroupbox("FPS Boost", "gauge")
+    local FpsBox = OtherTab:AddRightGroupbox("FPS Boost", "gauge")
 
     local fpsBoostOn = false
     local savedLighting = nil

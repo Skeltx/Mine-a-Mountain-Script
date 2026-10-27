@@ -327,7 +327,9 @@ local Tabs = {
     movement = Window:AddTab("Movement", "zap"),
 }
 
+local EventsTab = Window:AddTab("Events", "calendar")
 local SettingsTab = Window:AddTab("Settings", "sliders-horizontal")
+local OtherTab = Window:AddTab("Other", "box")
 
 local EspHolder = Instance.new("Folder")
 EspHolder.Name = "UniverseCrystalEsp"
@@ -1023,6 +1025,8 @@ E.ThemeManager = ThemeManager
 E.Window = Window
 E.Tabs = Tabs
 E.SettingsTab = SettingsTab
+E.EventsTab = EventsTab
+E.OtherTab = OtherTab
 E.EspHolder = EspHolder
 E.reportError = reportError
 E.formatShort = formatShort

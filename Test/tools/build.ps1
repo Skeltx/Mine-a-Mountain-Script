@@ -22,7 +22,7 @@ $mainExports = @(
     'Services','LocalPlayer','Mouse','Config','State','Storage','Connections','GuiRoot','Remotes',
     'ESP','PLAYER','PACE','TP','PICK','COLORS','TIER_NAMES','LUCK','MUTATION_LUCK','WATCHED_ATTRIBUTES',
     'SUFFIXES','PARSE_MULTIPLIERS','CONTAINER_NAMES',
-    'Library','SaveManager','ThemeManager','Window','Tabs','SettingsTab','EspHolder',
+    'Library','SaveManager','ThemeManager','Window','Tabs','SettingsTab','EventsTab','OtherTab','EspHolder',
     'reportError','formatShort','formatWeight','formatDistance','formatLuck','parseValue',
     'bindCharacter','getRoot','getAttr',
     'crystalValue','crystalWeight','crystalTier','crystalRarity','crystalName','crystalColor',
@@ -139,66 +139,66 @@ end)
 $fragments = [ordered]@{
     '00_main.lua' = @{
         Title = 'CORE — конфиг, сервисы, стейт, UI-окно, общие хелперы'
-        Ranges = @('1-736', '1325-1484')
+        Ranges = @('1-738', '1327-1486')
         Imports = @()
         ExtraBody = $schedulerCode
         Exports = $mainExports
     }
     '10_esp.lua' = @{
         Title = 'ESP — движок ESP кристаллов/игроков + вкладка Crystals + Player ESP (UI)'
-        Ranges = @('737-1324', '3183-3273')
+        Ranges = @('739-1326', '3185-3275')
         Exports = @('clearRegistry','clearPlayerEsp','unwatchContainers','newLabel')
     }
     '15_net.lua' = @{
         Title = 'NET — серверный хоп/тёплый пул серверов, авто-rejoin'
-        Ranges = @('3557-3798')
+        Ranges = @('3559-3800')
         Exports = @('Net')
     }
     '20_boulders.lua' = @{
         Title = 'BOULDERS — движок Mountain (копание валунов), aimTeleport, вкладка Boulders, Boulder Farm'
-        Ranges = @('2072-2708', '3274-3307', '3799-4995')
+        Ranges = @('2074-2710', '3276-3309', '3801-4997')
         Exports = @('Mountain','Farm','aimTeleport','tpToRank','fireRemote','unfavoriteAll','mountainSpot','mountainSpan','getSellCFrame')
         LocalImports = @('newLabel')
         LazyImports = @('Move','crystalPrompt','firePrompt','sortedByScore')
     }
     '30_farm.lua' = @{
         Title = 'FARM — промпты/авто-сбор кристаллов, бэкпак, Auto Farm Crystal'
-        Ranges = @('1485-1896', '3432-3462', '4996-5934', '6015-6019')
+        Ranges = @('1487-1898', '3434-3464', '4998-5936', '6017-6021')
         Exports = @('Money','restoreInstantPrompts','crystalPrompt','firePrompt')
         LocalImports = @('Mountain','Farm','fireRemote','unfavoriteAll','mountainSpot','mountainSpan')
         LazyImports = @('Move')
     }
     '40_shop.lua' = @{
         Title = 'SHOP — Bomb Auto Buy (закупка бомб)'
-        Ranges = @('5936-6013')
+        Ranges = @('5938-6015')
         Exports = @()
     }
     '50_teleports.lua' = @{
         Title = 'TELEPORTS — Top Crystals, Teleports (UI), обработка инпута (E/aim-TP)'
-        Ranges = @('2035-2070', '3308-3431', '3507-3556')
+        Ranges = @('2037-2072', '3310-3433', '3509-3558')
         Exports = @()
         LocalImports = @('tpToRank','fireRemote','unfavoriteAll','getSellCFrame')
         LazyImports = @('Move','firePrompt')
     }
     '60_movement.lua' = @{
         Title = 'MOVEMENT — Speed/Noclip/InfJump/Fly + вкладка Movement'
-        Ranges = @('1898-1954', '2709-3182', '3463-3506')
+        Ranges = @('1900-1956', '2711-3184', '3465-3508')
         Exports = @('Move','setSpeedBoost')
     }
     '70_settings.lua' = @{
         Title = 'SETTINGS — SaveManager, ThemeManager, вкладка Settings, cleanupAll/unload'
-        Ranges = @('6021-6229')
+        Ranges = @('6023-6231')
         Exports = @()
         LocalImports = @('Mountain','Farm','Money','Net','Move','setSpeedBoost','restoreInstantPrompts','clearRegistry','clearPlayerEsp','unwatchContainers')
     }
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
-        Ranges = @('6231-6806')
+        Ranges = @('6233-6807')
         Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
         Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
-        Ranges = @('6809-7463')
+        Ranges = @('6810-7464')
         ExtraBody = $reshowCode
         Exports = @()
         LocalImports = @('_eventsStops')
