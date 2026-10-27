@@ -721,7 +721,7 @@ end
 
 do
     local function install()
-        local BoulderBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP", "mountain")
+        local BoulderBox = Tabs.esp:AddLeftGroupbox("Boulder ESP", "mountain")
 
         BoulderBox:AddToggle("BoulderEsp", {
             Text = "Boulder ESP",
@@ -1847,7 +1847,7 @@ do
             Mountain.setAutoGrab(true)
         end
 
-        local FarmBox = Tabs.boulders:AddRightGroupbox("Boulder Farm", "bot")
+        local FarmBox = Tabs.farming:AddRightGroupbox("Boulder Farm", "bot")
         FarmBox:AddLabel("Specialized in rune farming", true)
         FarmBox:AddDivider()
 

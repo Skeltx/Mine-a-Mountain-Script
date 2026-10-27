@@ -321,9 +321,7 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    crystals = Window:AddTab("Crystals", "gem"),
-    players = Window:AddTab("Players", "users"),
-    boulders = Window:AddTab("Boulders", "mountain"),
+    esp = Window:AddTab("ESP", "eye"),
     teleports = Window:AddTab("Teleports", "crosshair"),
     farming = Window:AddTab("Farming", "pickaxe"),
     movement = Window:AddTab("Movement", "zap"),

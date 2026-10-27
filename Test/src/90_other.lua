@@ -37,11 +37,9 @@ local teleportTo = E.teleportTo
 local _eventsStops = E._eventsStops
 
 -- ====================================================================
--- ВКЛАДКА OTHER https://t.me/ske1tx
--- ====================================================================
-local OtherTab = Window:AddTab("Other", "box")
-local OtherBox = OtherTab:AddLeftGroupbox("Collect", "box")
-OtherBox:AddLabel("Здесь будут появляться функции.", true)
+-- Collect Rune перенесён из вкладки Other во вкладку Farming (правый блок)
+-- ==================================================================== 
+local OtherBox = Tabs.farming:AddRightGroupbox("Collect Rune", "box")
 OtherBox:AddDivider()
 
 -- ↓↓↓ Collect Rune ↓↓↓
@@ -135,7 +133,7 @@ end)
 -- BOULDERS ESP (Other) — все валуны, фильтр по типам
 -- (перенесено из вкладки Other в Boulders как отдельный аналог ESP)
 -- ====================================================================
-local BouldersOtherBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
+local BouldersOtherBox = Tabs.esp:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
 
 local bouldersOtherRunning = false
 local bouldersOtherCache = {}
@@ -590,7 +588,7 @@ end
 -- FPS BOOST
 -- ====================================================================
 do
-    local FpsBox = OtherTab:AddRightGroupbox("FPS Boost", "gauge")
+    local FpsBox = SettingsTab:AddRightGroupbox("FPS Boost", "gauge")
 
     local fpsBoostOn = false
     local savedLighting = nil

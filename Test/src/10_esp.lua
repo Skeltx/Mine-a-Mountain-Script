@@ -665,7 +665,7 @@ end
 
 do
     local function install()
-        local CrystalBox = Tabs.crystals:AddLeftGroupbox("Crystal ESP", "gem")
+        local CrystalBox = Tabs.esp:AddLeftGroupbox("Crystal ESP", "gem")
 
         CrystalBox:AddToggle("CrystalEsp", {
             Text = "Crystal ESP",
@@ -723,7 +723,7 @@ end
 
 do
     local function install()
-        local PlayerBox = Tabs.players:AddLeftGroupbox("Player ESP", "users")
+        local PlayerBox = Tabs.esp:AddLeftGroupbox("Player ESP", "users")
 
         PlayerBox:AddToggle("PlayerEsp", {
             Text = "Player ESP",
