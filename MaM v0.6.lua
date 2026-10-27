@@ -3802,9 +3802,7 @@ local Farm = {}
 
 do
     local function install()
-        -- Пресеты типов валунов убраны: список Targets заполняется автоматически
-        -- сканом карты (кнопки Select All / Clear Filter).
-        local FARM_KINDS = {}
+        local FARM_KINDS = { "Mossite", "Voltite", "Gildrite", "Rimeveil", "Nocturnite" }
 
         local SCAN_SPOTS = {
             CFrame.new(-12.7105675, 459.090942, 818.847412, 0.993408799, -0.00500036497, -0.11451605, 0.000644713698, 0.999275982, -0.0380407833, 0.114623353, 0.0377162211, 0.992692769),
@@ -4330,11 +4328,6 @@ do
                     return kind
                 end
             end
-            -- неизвестный игре тип: имя модели само становится "типом" — так фармятся
-            -- любые новые валуны, добавленные разработчиком, без правки FARM_KINDS
-            if str ~= "" then
-                return str
-            end
             return nil
         end
 
@@ -4808,23 +4801,6 @@ do
             end
         end
 
-        -- Скан всех валунов на карте: уникальные типы для списка Targets/ESP
-        local function scanBoulderKinds()
-            local found, list = {}, {}
-            for _, container in ipairs(boulderRoots()) do
-                for _, child in ipairs(container:GetChildren()) do
-                    local attrName = getAttr(child, "BoulderName")
-                    local str = tostring(attrName or child.Name)
-                    if str ~= "" and not found[str] then
-                        found[str] = true
-                        list[#list + 1] = str
-                    end
-                end
-            end
-            table.sort(list)
-            return list
-        end
-
         local function setTargets(value)
             table.clear(targets)
             if type(value) == "table" then
@@ -4902,56 +4878,6 @@ do
             AllowNull = true,
             Callback = setTargets,
         })
-
-        -- Сканирует валуны, реально присутствующие на карте, и обновляет список Targets.
-        FarmBox:AddButton("Select All", function()
-            local present = scanBoulderKinds()
-            local values, seen = {}, {}
-            for _, kind in ipairs(FARM_KINDS) do
-                values[#values + 1] = kind
-                seen[kind] = true
-            end
-            for _, kind in ipairs(present) do
-                if not seen[kind] then
-                    values[#values + 1] = kind
-                    seen[kind] = true
-                end
-            end
-            local all = {}
-            for _, kind in ipairs(values) do
-                all[kind] = true
-            end
-            local dd = Library.Options and Library.Options.FarmTargets
-            if dd then
-                pcall(function() dd:SetValues(values) end)
-                pcall(function() dd:SetValue(all) end)
-            end
-            setTargets(all)
-            Library:Notify(string.format("Boulders на карте: %d типов (выбраны все)", #values), 3)
-        end)
-
-        FarmBox:AddButton("Clear Filter", function()
-            local present = scanBoulderKinds()
-            local values, seen = {}, {}
-            for _, kind in ipairs(FARM_KINDS) do
-                values[#values + 1] = kind
-                seen[kind] = true
-            end
-            for _, kind in ipairs(present) do
-                if not seen[kind] then
-                    values[#values + 1] = kind
-                    seen[kind] = true
-                end
-            end
-            local dd = Library.Options and Library.Options.FarmTargets
-            if dd then
-                pcall(function() dd:SetValues(values) end)
-                pcall(function() dd:SetValue({}) end)
-                pcall(function() dd:SetValue(nil) end)
-            end
-            setTargets(nil)
-            Library:Notify(string.format("Boulders на карте: %d типов (фильтр сброшен)", #values), 3)
-        end)
 
         FarmBox:AddToggle("AutoFarmBoulders", {
             Text = "Auto Farm",
@@ -6224,21 +6150,21 @@ getgenv().UniverseUnload = cleanupAll
 Library:OnUnload(cleanupAll)
 
 -- ====================================================================
--- ВАЖНО (fix "Out of local registers"): авторский блок (Events/Other и
--- новые функции ниже) обёрнут в функцию — его локали не занимают регистры
--- основного чанка (лимит 200), а живут в собственном пространстве функции.
--- Запуск — в самом конце файла (__initAuthorBlock()).
+-- ╨Т╨Р╨Ц╨Э╨Ю (fix "Out of local registers"): ╨░╨▓╤В╨╛╤А╤Б╨║╨╕╨╣ ╨▒╨╗╨╛╨║ (Events/Other ╨╕
+-- ╨╜╨╛╨▓╤Л╨╡ ╤Д╤Г╨╜╨║╤Ж╨╕╨╕ ╨╜╨╕╨╢╨╡) ╨╛╨▒╤С╤А╨╜╤Г╤В ╨▓ ╤Д╤Г╨╜╨║╤Ж╨╕╤О тАФ ╨╡╨│╨╛ ╨╗╨╛╨║╨░╨╗╨╕ ╨╜╨╡ ╨╖╨░╨╜╨╕╨╝╨░╤О╤В ╤А╨╡╨│╨╕╤Б╤В╤А╤Л
+-- ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨│╨╛ ╤З╨░╨╜╨║╨░ (╨╗╨╕╨╝╨╕╤В 200), ╨░ ╨╢╨╕╨▓╤Г╤В ╨▓ ╤Б╨╛╨▒╤Б╤В╨▓╨╡╨╜╨╜╨╛╨╝ ╨┐╤А╨╛╤Б╤В╤А╨░╨╜╤Б╤В╨▓╨╡ ╤Д╤Г╨╜╨║╤Ж╨╕╨╕.
+-- ╨Ч╨░╨┐╤Г╤Б╨║ тАФ ╨▓ ╤Б╨░╨╝╨╛╨╝ ╨║╨╛╨╜╤Ж╨╡ ╤Д╨░╨╣╨╗╨░ (__initAuthorBlock()).
 -- ====================================================================
 local __initAuthorBlock = function()
 -- ====================================================================
--- ВКЛАДКА EVENTS
+-- ╨Т╨Ъ╨Ы╨Р╨Ф╨Ъ╨Р EVENTS
 -- ====================================================================
 local EventsTab = Window:AddTab("Events", "calendar")
 local EventsBox = EventsTab:AddLeftGroupbox("Halloween 2026", "calendar")
 EventsBox:AddLabel("Event Halloween 2026", true)
 EventsBox:AddDivider()
 
--- Стоп-функции всех ивент-функций (вызываются цепочкой при выгрузке скрипта)
+-- ╨б╤В╨╛╨┐-╤Д╤Г╨╜╨║╤Ж╨╕╨╕ ╨▓╤Б╨╡╤Е ╨╕╨▓╨╡╨╜╤В-╤Д╤Г╨╜╨║╤Ж╨╕╨╣ (╨▓╤Л╨╖╤Л╨▓╨░╤О╤В╤Б╤П ╤Ж╨╡╨┐╨╛╤З╨║╨╛╨╣ ╨┐╤А╨╕ ╨▓╤Л╨│╤А╤Г╨╖╨║╨╡ ╤Б╨║╤А╨╕╨┐╤В╨░)
 local _eventsStops = {}
 
 local camera = Services.Workspace.CurrentCamera
@@ -6250,50 +6176,12 @@ local VirtualUser = Services.VirtualUser
 local isCandyRunning = false
 local origCol = {}
 
--- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель).
--- По скану CandyScan: настоящие конфеты — незаякоренные MeshPart в Workspace/DroppedCandy,
--- а заякоренные "candy"-объекты (VFX_Candy_*, Deco_CandyBowl) — это эффекты и декорации,
--- их собираемому касанию сервер не отдаёт — отсеиваем по Anchored.
 local function isCandy(obj)
-    if not obj or not obj.Parent then return false end
-    if not (obj:IsA("BasePart") or obj:IsA("Model")) then return false end
-    if obj:IsA("BasePart") then
-        if obj.Anchored then return false end
-    else
-        local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
-        if part and part.Anchored then return false end
-    end
-
-    local hit = string.lower(obj.Name):find("candy") ~= nil
-    if not hit then
-        local p = obj.Parent
-        while p and p ~= Services.Workspace do
-            if string.lower(p.Name):find("candy") then
-                hit = true
-                break
-            end
-            p = p.Parent
-        end
-    end
-    if not hit then return false end
-
-    -- исключения: грядки/базы/установленное — проверяем по всей цепочке предков
-    local p2 = obj
-    while p2 and p2 ~= Services.Workspace do
-        local ln = string.lower(p2.Name)
-        if ln:find("plot") or ln:find("base") or ln:find("placed") then return false end
-        p2 = p2.Parent
-    end
-    return true
-end
-
-local function candyPos(obj)
-    if obj:IsA("BasePart") then return obj.Position end
-    if obj:IsA("Model") then
-        local ok, pv = pcall(obj.GetPivot, obj)
-        if ok and pv then return pv.Position end
-    end
-    return nil
+    if not obj or not obj.Parent or not obj:IsA("BasePart") then return false end
+    if obj.Anchored then return false end
+    local n, p = string.lower(obj.Name), obj.Parent and string.lower(obj.Parent.Name) or ""
+    local f = string.lower(obj:GetFullName())
+    return (n:find("candy") or p:find("candy")) and not (f:find("plot") or f:find("base") or f:find("placed") or p:find("plot"))
 end
 
 local function toggleNoclip(char, state)
@@ -6344,31 +6232,17 @@ task.spawn(function()
         for _, v in ipairs(Services.Workspace:GetDescendants()) do
             if not isCandyRunning then break end
 
-            -- устойчивость к респавну: персонаж перечитывается на каждом шаге
+            -- ╤Г╤Б╤В╨╛╨╣╤З╨╕╨▓╨╛╤Б╤В╤М ╨║ ╤А╨╡╤Б╨┐╨░╨▓╨╜╤Г: ╨┐╨╡╤А╤Б╨╛╨╜╨░╨╢ ╨┐╨╡╤А╨╡╤З╨╕╤В╤Л╨▓╨░╨╡╤В╤Б╤П ╨╜╨░ ╨║╨░╨╢╨┤╨╛╨╝ ╤И╨░╨│╨╡
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if not (char and hrp) then break end
 
             if isCandy(v) then
-                -- одна конфета = один заход: деталь внутри модели-конфеты ждёт сама модель
-                if v:IsA("BasePart") and v.Parent and v.Parent:IsA("Model") and isCandy(v.Parent) then
-                    continue
-                end
-                -- до 3 попыток на конфету: телепорт прямо в точку, чуть выше, со сдвигом.
-                -- Если после захода конфета ещё на месте (сервер не засчитал касание) — пробуем снова.
-                for _, offset in ipairs({ Vector3.zero, Vector3.new(0, 1.5, 0), Vector3.new(1.2, 0.6, 0) }) do
-                    if not v.Parent or not isCandyRunning then break end
-                    local pos = candyPos(v)
-                    if not pos then break end
-                    toggleNoclip(char, true)
-                    hrp.CFrame = CFrame.new(pos + offset)
-                    task.wait(0.22)
-                    char = LocalPlayer.Character
-                    hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    if not (char and hrp) then break end
-                end
                 foundAny = true
+                toggleNoclip(char, true)
+                hrp.CFrame = CFrame.new(v.Position + Vector3.new(0, 2, 0))
                 candyCollected += 1
+                task.wait(0.35)
             end
         end
 
@@ -6380,9 +6254,9 @@ end)
 
 
 -- ====================================================================
--- 2/3. AUTO FARM CAVEGHOST / SMASHABLE PUMPKIN (общая фабрика ниже)
+-- 2/3. AUTO FARM CAVEGHOST / SMASHABLE PUMPKIN (╨╛╨▒╤Й╨░╤П ╤Д╨░╨▒╤А╨╕╨║╨░ ╨╜╨╕╨╢╨╡)
 -- ====================================================================
--- (локальные переменные старых реализаций больше не нужны)
+-- (╨╗╨╛╨║╨░╨╗╤М╨╜╤Л╨╡ ╨┐╨╡╤А╨╡╨╝╨╡╨╜╨╜╤Л╨╡ ╤Б╤В╨░╤А╤Л╤Е ╤А╨╡╨░╨╗╨╕╨╖╨░╤Ж╨╕╨╣ ╨▒╨╛╨╗╤М╤И╨╡ ╨╜╨╡ ╨╜╤Г╨╢╨╜╤Л)
 
 local RemotesFolder = Services.ReplicatedStorage:FindFirstChild("Remotes") or Services.ReplicatedStorage:WaitForChild("Remotes", 5)
 local DigRequest = RemotesFolder and RemotesFolder:FindFirstChild("DigRequest")
@@ -6429,26 +6303,26 @@ local function equipPickaxe()
 end
 
 -- ====================================================================
--- ОБЩАЯ ФАБРИКА ФАРМА ИВЕНТ-СУЩНОСТЕЙ (CaveGhost / SmashablePumpkin)
--- Адаптивные удары по реальному урону, анти-залипание (таймаут на цель),
--- авто-продажа при полной сумке, устойчивость к респавну, счётчики.
+-- ╨Ю╨С╨й╨Р╨п ╨д╨Р╨С╨а╨Ш╨Ъ╨Р ╨д╨Р╨а╨Ь╨Р ╨Ш╨Т╨Х╨Э╨в-╨б╨г╨й╨Э╨Ю╨б╨в╨Х╨Щ (CaveGhost / SmashablePumpkin)
+-- ╨Р╨┤╨░╨┐╤В╨╕╨▓╨╜╤Л╨╡ ╤Г╨┤╨░╤А╤Л ╨┐╨╛ ╤А╨╡╨░╨╗╤М╨╜╨╛╨╝╤Г ╤Г╤А╨╛╨╜╤Г, ╨░╨╜╤В╨╕-╨╖╨░╨╗╨╕╨┐╨░╨╜╨╕╨╡ (╤В╨░╨╣╨╝╨░╤Г╤В ╨╜╨░ ╤Ж╨╡╨╗╤М),
+-- ╨░╨▓╤В╨╛-╨┐╤А╨╛╨┤╨░╨╢╨░ ╨┐╤А╨╕ ╨┐╨╛╨╗╨╜╨╛╨╣ ╤Б╤Г╨╝╨║╨╡, ╤Г╤Б╤В╨╛╨╣╤З╨╕╨▓╨╛╤Б╤В╤М ╨║ ╤А╨╡╤Б╨┐╨░╨▓╨╜╤Г, ╤Б╤З╤С╤В╤З╨╕╨║╨╕.
 -- opts = {
---     key          = имя опции (для SaveManager),
---     text         = текст тумблера,
---     label        = подпись для уведомлений,
---     matches      = function(obj) -> bool,    -- проверка "это наша цель?",
---     getPos       = function(obj) -> Vector3, -- позиция цели,
---     standDist    = число,   -- расстояние, с которого бьём (studs),
---     standOffset  = Vector3, -- смещение точки стояния,
---     lockAim      = bool,    -- true: держать позу/камеру каждый кадр,
---     hitTimeout   = число,   -- макс. сек на цель (когда HP известно),
---     bridgeTries  = число,   -- число волн, если HP неизвестно,
---     missCooldown = число,   -- сек в игнор-листе после промаха,
---     scanInterval = число,   -- сек между поисками новой цели,
---     hitWait      = число,   -- сек пауза между волнами удара,
+--     key          = ╨╕╨╝╤П ╨╛╨┐╤Ж╨╕╨╕ (╨┤╨╗╤П SaveManager),
+--     text         = ╤В╨╡╨║╤Б╤В ╤В╤Г╨╝╨▒╨╗╨╡╤А╨░,
+--     label        = ╨┐╨╛╨┤╨┐╨╕╤Б╤М ╨┤╨╗╤П ╤Г╨▓╨╡╨┤╨╛╨╝╨╗╨╡╨╜╨╕╨╣,
+--     matches      = function(obj) -> bool,    -- ╨┐╤А╨╛╨▓╨╡╤А╨║╨░ "╤Н╤В╨╛ ╨╜╨░╤И╨░ ╤Ж╨╡╨╗╤М?",
+--     getPos       = function(obj) -> Vector3, -- ╨┐╨╛╨╖╨╕╤Ж╨╕╤П ╤Ж╨╡╨╗╨╕,
+--     standDist    = ╤З╨╕╤Б╨╗╨╛,   -- ╤А╨░╤Б╤Б╤В╨╛╤П╨╜╨╕╨╡, ╤Б ╨║╨╛╤В╨╛╤А╨╛╨│╨╛ ╨▒╤М╤С╨╝ (studs),
+--     standOffset  = Vector3, -- ╤Б╨╝╨╡╤Й╨╡╨╜╨╕╨╡ ╤В╨╛╤З╨║╨╕ ╤Б╤В╨╛╤П╨╜╨╕╤П,
+--     lockAim      = bool,    -- true: ╨┤╨╡╤А╨╢╨░╤В╤М ╨┐╨╛╨╖╤Г/╨║╨░╨╝╨╡╤А╤Г ╨║╨░╨╢╨┤╤Л╨╣ ╨║╨░╨┤╤А,
+--     hitTimeout   = ╤З╨╕╤Б╨╗╨╛,   -- ╨╝╨░╨║╤Б. ╤Б╨╡╨║ ╨╜╨░ ╤Ж╨╡╨╗╤М (╨║╨╛╨│╨┤╨░ HP ╨╕╨╖╨▓╨╡╤Б╤В╨╜╨╛),
+--     bridgeTries  = ╤З╨╕╤Б╨╗╨╛,   -- ╤З╨╕╤Б╨╗╨╛ ╨▓╨╛╨╗╨╜, ╨╡╤Б╨╗╨╕ HP ╨╜╨╡╨╕╨╖╨▓╨╡╤Б╤В╨╜╨╛,
+--     missCooldown = ╤З╨╕╤Б╨╗╨╛,   -- ╤Б╨╡╨║ ╨▓ ╨╕╨│╨╜╨╛╤А-╨╗╨╕╤Б╤В╨╡ ╨┐╨╛╤Б╨╗╨╡ ╨┐╤А╨╛╨╝╨░╤Е╨░,
+--     scanInterval = ╤З╨╕╤Б╨╗╨╛,   -- ╤Б╨╡╨║ ╨╝╨╡╨╢╨┤╤Г ╨┐╨╛╨╕╤Б╨║╨░╨╝╨╕ ╨╜╨╛╨▓╨╛╨╣ ╤Ж╨╡╨╗╨╕,
+--     hitWait      = ╤З╨╕╤Б╨╗╨╛,   -- ╤Б╨╡╨║ ╨┐╨░╤Г╨╖╨░ ╨╝╨╡╨╢╨┤╤Г ╨▓╨╛╨╗╨╜╨░╨╝╨╕ ╤Г╨┤╨░╤А╨░,
 -- }
 -- ====================================================================
--- Текущее HP сущности (атрибуты HP/Health, Humanoid или дети), nil если неизвестно
+-- ╨в╨╡╨║╤Г╤Й╨╡╨╡ HP ╤Б╤Г╤Й╨╜╨╛╤Б╤В╨╕ (╨░╤В╤А╨╕╨▒╤Г╤В╤Л HP/Health, Humanoid ╨╕╨╗╨╕ ╨┤╨╡╤В╨╕), nil ╨╡╤Б╨╗╨╕ ╨╜╨╡╨╕╨╖╨▓╨╡╤Б╤В╨╜╨╛
 local function entityHPValue(obj)
     if not obj or not obj.Parent then return nil end
 
@@ -6469,7 +6343,7 @@ local function entityHPValue(obj)
 end
 
 local lastEventSellClock = 0
--- Авто-продажа при заполнении сумки выше AutoSellThreshold (для всех ивент-функций)
+-- ╨Р╨▓╤В╨╛-╨┐╤А╨╛╨┤╨░╨╢╨░ ╨┐╤А╨╕ ╨╖╨░╨┐╨╛╨╗╨╜╨╡╨╜╨╕╨╕ ╤Б╤Г╨╝╨║╨╕ ╨▓╤Л╤И╨╡ AutoSellThreshold (╨┤╨╗╤П ╨▓╤Б╨╡╤Е ╨╕╨▓╨╡╨╜╤В-╤Д╤Г╨╜╨║╤Ж╨╕╨╣)
 local function autoSellIfFilled()
     local capacity = backpackCapacity()
     if not capacity or capacity == math.huge then return end
@@ -6485,7 +6359,7 @@ local function autoSellIfFilled()
     task.spawn(function()
         local ok, sold = pcall(doSell)
         if ok and sold then
-            Library:Notify("Сумка полная - продаю всё", 3)
+            Library:Notify("╨б╤Г╨╝╨║╨░ ╨┐╨╛╨╗╨╜╨░╤П - ╨┐╤А╨╛╨┤╨░╤О ╨▓╤Б╤С", 3)
         end
     end)
 end
@@ -6521,7 +6395,7 @@ local function makeEntityFarmer(opts)
             hum.AutoRotate = true
         end
         if kills > 0 then
-            Library:Notify(string.format("%s: убито за сессию %d", opts.label or "Farm", kills), 4)
+            Library:Notify(string.format("%s: ╤Г╨▒╨╕╤В╨╛ ╨╖╨░ ╤Б╨╡╤Б╤Б╨╕╤О %d", opts.label or "Farm", kills), 4)
         end
         kills = 0
     end
@@ -6540,7 +6414,7 @@ local function makeEntityFarmer(opts)
         end,
     })
 
-    -- фоновая экипировка кирки
+    -- ╤Д╨╛╨╜╨╛╨▓╨░╤П ╤Н╨║╨╕╨┐╨╕╤А╨╛╨▓╨║╨░ ╨║╨╕╤А╨║╨╕
     task.spawn(function()
         while task.wait(0.5) do
             if not running then continue end
@@ -6552,7 +6426,7 @@ local function makeEntityFarmer(opts)
         end
     end)
 
-    -- основной цикл
+    -- ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨╣ ╤Ж╨╕╨║╨╗
     task.spawn(function()
         while task.wait(0.05) do
             if not running then continue end
@@ -6562,17 +6436,17 @@ local function makeEntityFarmer(opts)
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if not (char and hrp and hum) then continue end
 
-            -- авто-продажа при полной сумке
+            -- ╨░╨▓╤В╨╛-╨┐╤А╨╛╨┤╨░╨╢╨░ ╨┐╤А╨╕ ╨┐╨╛╨╗╨╜╨╛╨╣ ╤Б╤Г╨╝╨║╨╡
             pcall(autoSellIfFilled)
 
-            -- чистим игнор-лист
+            -- ╤З╨╕╤Б╤В╨╕╨╝ ╨╕╨│╨╜╨╛╤А-╨╗╨╕╤Б╤В
             for obj, expire in pairs(recentlyHit) do
                 if os.clock() > expire or not obj.Parent then
                     recentlyHit[obj] = nil
                 end
             end
 
-            -- ищем ближайшую цель (не чаще scanInterval)
+            -- ╨╕╤Й╨╡╨╝ ╨▒╨╗╨╕╨╢╨░╨╣╤И╤Г╤О ╤Ж╨╡╨╗╤М (╨╜╨╡ ╤З╨░╤Й╨╡ scanInterval)
             if not (currentTarget and currentTarget.Parent) then
                 currentTarget = nil
                 local now = os.clock()
@@ -6605,7 +6479,7 @@ local function makeEntityFarmer(opts)
                 continue
             end
 
-            -- заморозка
+            -- ╨╖╨░╨╝╨╛╤А╨╛╨╖╨║╨░
             local bv = Instance.new("BodyVelocity")
             bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
             bv.Velocity = Vector3.zero
@@ -6640,7 +6514,7 @@ local function makeEntityFarmer(opts)
 
             task.wait(0.1)
 
-            -- удары: адаптивно, ориентируемся на реальный урон
+            -- ╤Г╨┤╨░╤А╤Л: ╨░╨┤╨░╨┐╤В╨╕╨▓╨╜╨╛, ╨╛╤А╨╕╨╡╨╜╤В╨╕╤А╤Г╨╡╨╝╤Б╤П ╨╜╨░ ╤А╨╡╨░╨╗╤М╨╜╤Л╨╣ ╤Г╤А╨╛╨╜
             pcall(equipPickaxe)
             local tool = char:FindFirstChildOfClass("Tool")
 
@@ -6687,7 +6561,7 @@ local function makeEntityFarmer(opts)
 
                 task.wait(opts.hitWait or 0.15)
 
-                -- проверяем реальный урон
+                -- ╨┐╤А╨╛╨▓╨╡╤А╤П╨╡╨╝ ╤А╨╡╨░╨╗╤М╨╜╤Л╨╣ ╤Г╤А╨╛╨╜
                 local newHP = entityHPValue(target)
                 if newHP ~= nil then
                     if not deadline then
@@ -6704,19 +6578,19 @@ local function makeEntityFarmer(opts)
                 end
             end
 
-            -- итог по цели
+            -- ╨╕╤В╨╛╨│ ╨┐╨╛ ╤Ж╨╡╨╗╨╕
             if not target.Parent or (hp ~= nil and hp <= 0) then
                 kills += 1
                 if kills % 10 == 0 then
-                    Library:Notify(string.format("%s: убито %d", opts.label or "Farm", kills), 3)
+                    Library:Notify(string.format("%s: ╤Г╨▒╨╕╤В╨╛ %d", opts.label or "Farm", kills), 3)
                 end
             elseif not seenDamage then
-                -- урон не прошёл — метод не работает для этой цели, игнор-лист
+                -- ╤Г╤А╨╛╨╜ ╨╜╨╡ ╨┐╤А╨╛╤И╤С╨╗ тАФ ╨╝╨╡╤В╨╛╨┤ ╨╜╨╡ ╤А╨░╨▒╨╛╤В╨░╨╡╤В ╨┤╨╗╤П ╤Н╤В╨╛╨╣ ╤Ж╨╡╨╗╨╕, ╨╕╨│╨╜╨╛╤А-╨╗╨╕╤Б╤В
                 recentlyHit[target] = os.clock() + (opts.missCooldown or 2)
             end
             currentTarget = nil
 
-            -- разморозка
+            -- ╤А╨░╨╖╨╝╨╛╤А╨╛╨╖╨║╨░
             if lockConn then lockConn:Disconnect() end
             pcall(function() bv:Destroy() end)
             if hum and hum.Parent then
@@ -6752,12 +6626,12 @@ makeEntityFarmer({
     end,
     standDist = 2,
     standOffset = Vector3.new(0, -1.5, 0),
-    lockAim = false, -- одноразовая наводка, как в оригинале
+    lockAim = false, -- ╨╛╨┤╨╜╨╛╤А╨░╨╖╨╛╨▓╨░╤П ╨╜╨░╨▓╨╛╨┤╨║╨░, ╨║╨░╨║ ╨▓ ╨╛╤А╨╕╨│╨╕╨╜╨░╨╗╨╡
     hitTimeout = 8,
     missCooldown = 2,
 })
 
--- (основной цикл фарма внутри makeEntityFarmer)
+-- (╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨╣ ╤Ж╨╕╨║╨╗ ╤Д╨░╤А╨╝╨░ ╨▓╨╜╤Г╤В╤А╨╕ makeEntityFarmer)
 
 -- ====================================================================
 -- 3. AUTO FARM SMASHABLE PUMPKIN
@@ -6792,7 +6666,7 @@ makeEntityFarmer({
     missCooldown = 2,
 })
 
--- Остановка всех ивент-функций при выгрузке/перезапуске скрипта
+-- ╨Ю╤Б╤В╨░╨╜╨╛╨▓╨║╨░ ╨▓╤Б╨╡╤Е ╨╕╨▓╨╡╨╜╤В-╤Д╤Г╨╜╨║╤Ж╨╕╨╣ ╨┐╤А╨╕ ╨▓╤Л╨│╤А╤Г╨╖╨║╨╡/╨┐╨╡╤А╨╡╨╖╨░╨┐╤Г╤Б╨║╨╡ ╤Б╨║╤А╨╕╨┐╤В╨░
 do
     local _prevUnload = getgenv().UniverseUnload
     local function _combined()
@@ -6809,14 +6683,14 @@ end
 
 
 -- ====================================================================
--- ВКЛАДКА OTHER https://t.me/ske1tx
+-- ╨Т╨Ъ╨Ы╨Р╨Ф╨Ъ╨Р OTHER https://t.me/ske1tx
 -- ====================================================================
 local OtherTab = Window:AddTab("Other", "box")
 local OtherBox = OtherTab:AddLeftGroupbox("Collect", "box")
-OtherBox:AddLabel("Здесь будут появляться функции.", true)
+OtherBox:AddLabel("╨Ч╨┤╨╡╤Б╤М ╨▒╤Г╨┤╤Г╤В ╨┐╨╛╤П╨▓╨╗╤П╤В╤М╤Б╤П ╤Д╤Г╨╜╨║╤Ж╨╕╨╕.", true)
 OtherBox:AddDivider()
 
--- ↓↓↓ Collect Rune ↓↓↓
+-- тЖУтЖУтЖУ Collect Rune тЖУтЖУтЖУ
 local isRuneRunning = false
 local origColRune = {}
 
@@ -6877,7 +6751,7 @@ task.spawn(function()
         for _, v in ipairs(Services.Workspace:GetDescendants()) do
             if not isRuneRunning then break end
 
-            -- устойчивость к респавну: персонаж перечитывается на каждом шаге
+            -- ╤Г╤Б╤В╨╛╨╣╤З╨╕╨▓╨╛╤Б╤В╤М ╨║ ╤А╨╡╤Б╨┐╨░╨▓╨╜╤Г: ╨┐╨╡╤А╤Б╨╛╨╜╨░╨╢ ╨┐╨╡╤А╨╡╤З╨╕╤В╤Л╨▓╨░╨╡╤В╤Б╤П ╨╜╨░ ╨║╨░╨╢╨┤╨╛╨╝ ╤И╨░╨│╨╡
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if not (char and hrp) then break end
@@ -6904,17 +6778,16 @@ task.spawn(function()
 end)
 
 -- ====================================================================
--- BOULDERS ESP (Other) — все валуны, фильтр по типам
--- (перенесено из вкладки Other в Boulders как отдельный аналог ESP)
+-- BOULDERS ESP (Other) тАФ ╨▓╤Б╨╡ ╨▓╨░╨╗╤Г╨╜╤Л, ╤Д╨╕╨╗╤М╤В╤А ╨┐╨╛ ╤В╨╕╨┐╨░╨╝
 -- ====================================================================
-local BouldersOtherBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
+local BouldersOtherBox = OtherTab:AddRightGroupbox("Boulders ESP", "mountain")
 
 local bouldersOtherRunning = false
 local bouldersOtherCache = {}
 local bouldersOtherConns = {}
 local bouldersOtherColorCache = {}
 local bouldersOtherKnownNames = {}
-local bouldersOtherFilter = nil  -- nil или пустая таблица = показывать всё
+local bouldersOtherFilter = nil  -- nil ╨╕╨╗╨╕ ╨┐╤Г╤Б╤В╨░╤П ╤В╨░╨▒╨╗╨╕╤Ж╨░ = ╨┐╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╨▓╤Б╤С
 
 local bouldersOtherKnownColors = {
     Mossite    = {Color3.new(200/255, 205/255, 215/255), "rgb(200,205,215)"},
@@ -7216,7 +7089,7 @@ local function bouldersOtherStart()
 
     boulderScanFolder()
 
-    -- Если валуны ещё не прогрузились (стриминг карты) — дособираем их сразу после включения
+    -- ╨Х╤Б╨╗╨╕ ╨▓╨░╨╗╤Г╨╜╤Л ╨╡╤Й╤С ╨╜╨╡ ╨┐╤А╨╛╨│╤А╤Г╨╖╨╕╨╗╨╕╤Б╤М (╤Б╤В╤А╨╕╨╝╨╕╨╜╨│ ╨║╨░╤А╤В╤Л) тАФ ╨┤╨╛╤Б╨╛╨▒╨╕╤А╨░╨╡╨╝ ╨╕╤Е ╤Б╤А╨░╨╖╤Г ╨┐╨╛╤Б╨╗╨╡ ╨▓╨║╨╗╤О╤З╨╡╨╜╨╕╤П
     task.spawn(function()
         for _ = 1, 12 do
             local md = Services.Workspace:FindFirstChild("MountainDecorations")
@@ -7279,8 +7152,15 @@ BouldersOtherBox:AddToggle("BoulderEspOtherToggle", {
 
 BouldersOtherBox:AddDivider()
 
--- Пресеты типов убраны: типы появляются в списке автоматически по мере скана карты
--- (фоновый скан при включённом ESP, а также кнопки Select All / Clear Filter).
+-- ╨Я╤А╨╡╨┤╨╖╨░╨┐╨╛╨╗╨╜╤П╨╡╨╝ ╨╕╨╖╨▓╨╡╤Б╤В╨╜╤Л╨╡ ╤В╨╕╨┐╤Л (╨▓╤Б╨╡ ╨▓╨║╨╗╤О╤З╨╡╨╜╤Л)
+do
+    local known = {}
+    for name in pairs(bouldersOtherKnownColors) do
+        known[name] = true
+        bouldersOtherKnownNames[name] = true
+    end
+    bouldersOtherFilter = known
+end
 
 BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     Text = "Show only these",
@@ -7290,8 +7170,22 @@ BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     Callback = bouldersOtherSetFilter,
 })
 
+-- ╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨╕╤А╤Г╨╡╨╝ dropdown ╤Б ╨╕╨╖╨▓╨╡╤Б╤В╨╜╤Л╨╝╨╕ ╤В╨╕╨┐╨░╨╝╨╕
+do
+    local dd = Library.Options.BoulderEspOtherFilter
+    if dd then
+        local list = {}
+        for name in pairs(bouldersOtherKnownNames) do list[#list + 1] = name end
+        table.sort(list)
+        pcall(function() dd:SetValues(list) end)
+        if bouldersOtherFilter then
+            pcall(function() dd:SetValue(bouldersOtherFilter) end)
+        end
+    end
+end
+
 BouldersOtherBox:AddButton("Select All", function()
-    -- Подгружаем все типы валунов, реально присутствующие на сервере, прямо сейчас
+    -- ╨Я╨╛╨┤╨│╤А╤Г╨╢╨░╨╡╨╝ ╨▓╤Б╨╡ ╤В╨╕╨┐╤Л ╨▓╨░╨╗╤Г╨╜╨╛╨▓, ╤А╨╡╨░╨╗╤М╨╜╨╛ ╨┐╤А╨╕╤Б╤Г╤В╤Б╤В╨▓╤Г╤О╤Й╨╕╨╡ ╨╜╨░ ╤Б╨╡╤А╨▓╨╡╤А╨╡, ╨┐╤А╤П╨╝╨╛ ╤Б╨╡╨╣╤З╨░╤Б
     boulderScanFolder(true)
 
     local all = {}
@@ -7312,7 +7206,6 @@ BouldersOtherBox:AddButton("Select All", function()
 end)
 
 BouldersOtherBox:AddButton("Clear Filter", function()
-    boulderScanFolder(true)
     bouldersOtherFilter = nil
     local dd = Library.Options.BoulderEspOtherFilter
     if dd then
@@ -7341,9 +7234,9 @@ do
 end
 
 -- ====================================================================
--- НОВЫЕ ФУНКЦИИ (Other): FPS Boost, оповещения о редких кристаллах,
+-- ╨Э╨Ю╨Т╨л╨Х ╨д╨г╨Э╨Ъ╨ж╨Ш╨Ш (Other): FPS Boost, ╨╛╨┐╨╛╨▓╨╡╤Й╨╡╨╜╨╕╤П ╨╛ ╤А╨╡╨┤╨║╨╕╤Е ╨║╤А╨╕╤Б╤В╨░╨╗╨╗╨░╤Е,
 -- Auto Farm Boulders (Other)
--- helper: заворачивает стоп-функцию в цепочку выгрузки скрипта
+-- helper: ╨╖╨░╨▓╨╛╤А╨░╤З╨╕╨▓╨░╨╡╤В ╤Б╤В╨╛╨┐-╤Д╤Г╨╜╨║╤Ж╨╕╤О ╨▓ ╤Ж╨╡╨┐╨╛╤З╨║╤Г ╨▓╤Л╨│╤А╤Г╨╖╨║╨╕ ╤Б╨║╤А╨╕╨┐╤В╨░
 -- ====================================================================
 local function otherWrapUnload(stopFn)
     local prev = getgenv().UniverseUnload
@@ -7438,7 +7331,7 @@ do
     end
 
     FpsBox:AddDivider()
-    FpsBox:AddLabel("FPS Boost (тени/туман/частицы)", true)
+    FpsBox:AddLabel("FPS Boost (╤В╨╡╨╜╨╕/╤В╤Г╨╝╨░╨╜/╤З╨░╤Б╤В╨╕╤Ж╤Л)", true)
     FpsBox:AddSlider("FpsBoostCap", {
         Text = "FPS Cap",
         Default = 240,
@@ -7465,8 +7358,194 @@ do
         end
     end)
 end
+
+-- ====================================================================
+-- AUTO FARM BOULDERS (Other) тАФ ╤Д╨░╤А╨╝╨╕╤В ╤В╨╛╨╗╤М╨║╨╛ ╨▓╤Л╨▒╤А╨░╨╜╨╜╤Л╨╡ ╨▓╨░╨╗╤Г╨╜╤Л (╤Д╨╕╨╗╤М╤В╤А ESP)
+-- ====================================================================
+do
+    local running = false
+    local brokenCount = 0
+    local cooldown = {} -- [model] = os.clock() + expire
+
+    local function stop()
+        running = false
+        table.clear(cooldown)
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+        if brokenCount > 0 then
+            Library:Notify(string.format("Boulders Farm: ╤Б╨╗╨╛╨╝╨░╨╜╨╛ ╨╖╨░ ╤Б╨╡╤Б╤Б╨╕╤О %d", brokenCount), 4)
+        end
+        brokenCount = 0
+    end
+
+    BouldersOtherBox:AddToggle("BouldersFarmOther", {
+        Text = "Auto Farm Boulders",
+        Default = false,
+        Callback = function(v)
+            if v then
+                running = true
+                brokenCount = 0
+            else
+                stop()
+            end
+        end,
+    })
+
+    -- ╤Д╨╛╨╜╨╛╨▓╨░╤П ╤Н╨║╨╕╨┐╨╕╤А╨╛╨▓╨║╨░ ╨║╨╕╤А╨║╨╕
+    task.spawn(function()
+        while task.wait(0.5) do
+            if not running then continue end
+
+            local char = LocalPlayer.Character
+            local held = char and char:FindFirstChildOfClass("Tool")
+            if held and isPickaxe(held) then continue end
+            pcall(equipPickaxe)
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait(0.1) do
+            if not running then continue end
+
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not (char and hrp and hum) then continue end
+
+            -- ╨░╨▓╤В╨╛-╨┐╤А╨╛╨┤╨░╨╢╨░ ╨┐╤А╨╕ ╨┐╨╛╨╗╨╜╨╛╨╣ ╤Б╤Г╨╝╨║╨╡
+            pcall(autoSellIfFilled)
+
+            local cam = Services.Workspace.CurrentCamera
+
+            local md = Services.Workspace:FindFirstChild("MountainDecorations")
+            local folder = md and md:FindFirstChild("Boulders")
+            if not folder then continue end
+
+            -- ╤З╨╕╤Б╤В╨╕╨╝ ╨║╤Г╨╗╨┤╨░╤Г╨╜╤Л
+            for obj, expire in pairs(cooldown) do
+                if os.clock() > expire or not obj.Parent then
+                    cooldown[obj] = nil
+                end
+            end
+
+            -- ╨▒╨╗╨╕╨╢╨░╨╣╤И╨╕╨╣ ╨╢╨╕╨▓╨╛╨╣ ╨▓╨░╨╗╤Г╨╜ ╨┐╨╛╨┤ ╤Д╨╕╨╗╤М╤В╤А
+            local best, bestDist = nil, math.huge
+            for _, model in ipairs(folder:GetChildren()) do
+                if model:IsA("Model") and not cooldown[model] then
+                    local hp = tonumber(model:GetAttribute("HP"))
+                    if hp ~= nil and hp > 0 and bouldersOtherIsEnabled(model.Name) then
+                        local anchor = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                        if anchor then
+                            local d = (anchor.Position - hrp.Position).Magnitude
+                            if d < bestDist then
+                                bestDist = d
+                                best = model
+                            end
+                        end
+                    end
+                end
+            end
+
+            if not best then continue end
+
+            local target = best
+            cooldown[target] = os.clock() + 1e9
+            local anchor = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+            if not anchor then
+                cooldown[target] = os.clock() + 5
+                continue
+            end
+            local pos = anchor.Position
+
+            -- ╨╖╨░╨╝╨╛╤А╨╛╨╖╨║╨░ ╨╕ ╨┐╨╛╨╖╨╕╤Ж╨╕╤П ╤Б╨▓╨╡╤А╤Е╤Г ╨▓╨░╨╗╤Г╨╜╨░
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.Velocity = Vector3.zero
+            bv.Parent = hrp
+            hum.WalkSpeed = 0
+            hum.JumpPower = 0
+
+            local aimCFrame = CFrame.lookAt(pos + Vector3.new(0, 7, 0), pos)
+            local lockConn = Services.RunService.RenderStepped:Connect(function()
+                if hrp and hrp.Parent then
+                    hrp.CFrame = aimCFrame
+                end
+                if cam then
+                    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos + Vector3.new(0, 2, 0))
+                end
+            end)
+
+            task.wait(0.1)
+
+            pcall(equipPickaxe)
+            local tool = char:FindFirstChildOfClass("Tool")
+
+            local hp = tonumber(target:GetAttribute("HP"))
+            local seenDamage = false
+            local deadline = os.clock() + 15
+
+            while running and target.Parent and os.clock() < deadline do
+                if tool and tool.Parent then
+                    pcall(function() tool:Activate() end)
+                    if DigRequest then
+                        pcall(function() DigRequest:FireServer(tool.Name, pos) end)
+                    end
+                end
+
+                local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    pcall(function()
+                        prompt.MaxActivationDistance = 99999
+                        prompt.RequiresLineOfSight = false
+                        prompt.HoldDuration = 0
+                        if fireproximityprompt then fireproximityprompt(prompt) end
+                    end)
+                end
+
+                task.wait(0.2)
+
+                local newHP = tonumber(target:GetAttribute("HP"))
+                if newHP ~= nil then
+                    if hp ~= nil and newHP < hp then
+                        seenDamage = true
+                    end
+                    hp = newHP
+                    if newHP <= 0 then
+                        seenDamage = true
+                        break
+                    end
+                end
+            end
+
+            local broken = (not target.Parent) or (hp ~= nil and hp <= 0)
+            if broken then
+                brokenCount += 1
+                if brokenCount % 5 == 0 then
+                    Library:Notify(string.format("Boulders Farm: ╤Б╨╗╨╛╨╝╨░╨╜╨╛ %d", brokenCount), 3)
+                end
+            end
+
+            -- ╨║╤Г╨╗╨┤╨░╤Г╨╜ ╨┐╨╛╨▓╤В╨╛╤А╨╜╨╛╨╣ ╨░╤В╨░╨║╨╕: ╨┤╨╛╨▒╨╕╨╗╨╕ -> ╨┤╨╛╨╗╨│╨╛, ╤З╨░╤Б╤В╨╕╤З╨╜╨╛ -> ╤Б╨║╨╛╤А╨╛, ╨┐╤А╨╛╨╝╨░╤Е -> ╨┤╨╛╨╗╨│╨╛
+            cooldown[target] = os.clock() + (broken and 30 or (seenDamage and 5 or 30))
+
+            if lockConn then
+                lockConn:Disconnect()
+            end
+            pcall(function() bv:Destroy() end)
+            if hum and hum.Parent then
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+            end
+        end
+    end)
+
+    otherWrapUnload(stop)
+end
 end -- __initAuthorBlock
 
--- Запуск авторского блока (обёртка от лимита локальных регистров)
+-- ╨Ч╨░╨┐╤Г╤Б╨║ ╨░╨▓╤В╨╛╤А╤Б╨║╨╛╨│╨╛ ╨▒╨╗╨╛╨║╨░ (╨╛╨▒╤С╤А╤В╨║╨░ ╨╛╤В ╨╗╨╕╨╝╨╕╤В╨░ ╨╗╨╛╨║╨░╨╗╤М╨╜╤Л╤Е ╤А╨╡╨│╨╕╤Б╤В╤А╨╛╨▓)
 __initAuthorBlock()
 __initAuthorBlock = nil
