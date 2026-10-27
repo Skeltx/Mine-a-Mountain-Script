@@ -6,8 +6,8 @@
 -- (или просто загрузить этот файл, если инжектор умеет).
 -- ============================================================
 
-local VERSION = "v0.6"
-local URL = "https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/MaM%20v0.6.lua"
+local VERSION = "v0.7"
+local URL = "https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/MaM%20v0.7.lua"
 
 print("[MaM] Загрузка последней версии (" .. VERSION .. ") ...")
 loadstring(game:HttpGet(URL))()
