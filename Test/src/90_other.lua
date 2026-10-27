@@ -692,3 +692,15 @@ do
     end)
 end
 
+-- === Гарантия видимости окна: AutoShow в Obsidian срабатывает один раз при
+-- создании окна; если в этот момент что-то из библиотечных аддонов пометило
+-- загрузку активной, окно может остаться скрытым. Через 3 секунды после
+-- полной загрузки всех модулей принудительно показываем, если скрыто. ===
+task.delay(3, function()
+    pcall(function()
+        local frame = Library.Window and Library.Window.MainFrame
+        if Library.Window and frame and (not Library.Toggled or not frame.Visible) then
+            Library:Toggle(true)
+        end
+    end)
+end)

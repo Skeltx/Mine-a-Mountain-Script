@@ -32,6 +32,21 @@ $mainExports = @(
     'requestStream','applyPivot','findClearGoal','finishTeleport','teleportTo','schedule'
 )
 
+$reshowCode = @'
+-- === Гарантия видимости окна: AutoShow в Obsidian срабатывает один раз при
+-- создании окна; если в этот момент что-то из библиотечных аддонов пометило
+-- загрузку активной, окно может остаться скрытым. Через 3 секунды после
+-- полной загрузки всех модулей принудительно показываем, если скрыто. ===
+task.delay(3, function()
+    pcall(function()
+        local frame = Library.Window and Library.Window.MainFrame
+        if Library.Window and frame and (not Library.Toggled or not frame.Visible) then
+            Library:Toggle(true)
+        end
+    end)
+end)
+'@
+
 $schedulerCode = @'
 -- === Центральный планировщик Heartbeat (перенесён из монолита) ===
 -- Каждый модуль регистрирует свои тик-функции через E.* — см. футеры модулей.
@@ -184,6 +199,7 @@ $fragments = [ordered]@{
     '90_other.lua' = @{
         Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
         Ranges = @('6809-7463')
+        ExtraBody = $reshowCode
         Exports = @()
         LocalImports = @('_eventsStops')
     }
@@ -266,7 +282,7 @@ foreach ($name in $fragments.Keys) {
 
     foreach ($t in $body) { $parts.Add($t) }
 
-    if ($name -eq '00_main.lua') {
+    if ($f.ExtraBody) {
         $parts.Add($f.ExtraBody)
     }
 
