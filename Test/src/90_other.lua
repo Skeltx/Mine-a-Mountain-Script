@@ -136,7 +136,7 @@ end)
 -- BOULDERS ESP (Other) — все валуны, фильтр по типам
 -- (перенесено из вкладки Other в Boulders как отдельный аналог ESP)
 -- ====================================================================
-local BouldersOtherBox = Tabs.esp:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
+local BouldersOtherBox = Tabs.esp:AddRightGroupbox("Boulder ESP (Analog)", "mountain")
 
 local bouldersOtherRunning = false
 local bouldersOtherCache = {}
