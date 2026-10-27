@@ -34,6 +34,8 @@ local ThemeManager = E.ThemeManager
 local Window = E.Window
 local Tabs = E.Tabs
 local SettingsTab = E.SettingsTab
+local EventsTab = E.EventsTab
+local OtherTab = E.OtherTab
 local EspHolder = E.EspHolder
 local reportError = E.reportError
 local formatShort = E.formatShort
@@ -721,7 +723,7 @@ end
 
 do
     local function install()
-        local BoulderBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP", "mountain")
+        local BoulderBox = Tabs.esp:AddRightGroupbox("Boulder ESP", "mountain")
 
         BoulderBox:AddToggle("BoulderEsp", {
             Text = "Boulder ESP",
@@ -1847,7 +1849,7 @@ do
             Mountain.setAutoGrab(true)
         end
 
-        local FarmBox = Tabs.boulders:AddRightGroupbox("Boulder Farm", "bot")
+        local FarmBox = Tabs.farming:AddRightGroupbox("Boulder Farm", "bot")
         FarmBox:AddLabel("Specialized in rune farming", true)
         FarmBox:AddDivider()
 

@@ -18,6 +18,9 @@ local Remotes = E.Remotes
 local Library = E.Library
 local Window = E.Window
 local Tabs = E.Tabs
+local SettingsTab = E.SettingsTab
+local EventsTab = E.EventsTab
+local OtherTab = E.OtherTab
 local reportError = E.reportError
 local formatShort = E.formatShort
 local formatWeight = E.formatWeight
@@ -37,11 +40,9 @@ local teleportTo = E.teleportTo
 local _eventsStops = E._eventsStops
 
 -- ====================================================================
--- ВКЛАДКА OTHER https://t.me/ske1tx
--- ====================================================================
-local OtherTab = Window:AddTab("Other", "box")
-local OtherBox = OtherTab:AddLeftGroupbox("Collect", "box")
-OtherBox:AddLabel("Здесь будут появляться функции.", true)
+-- Collect Rune перенесён из вкладки Other во вкладку Farming (правый блок)
+-- ==================================================================== 
+local OtherBox = Tabs.farming:AddLeftGroupbox("Collect Rune", "box")
 OtherBox:AddDivider()
 
 -- ↓↓↓ Collect Rune ↓↓↓
@@ -135,7 +136,7 @@ end)
 -- BOULDERS ESP (Other) — все валуны, фильтр по типам
 -- (перенесено из вкладки Other в Boulders как отдельный аналог ESP)
 -- ====================================================================
-local BouldersOtherBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
+local BouldersOtherBox = Tabs.esp:AddRightGroupbox("Boulder ESP (Analog)", "mountain")
 
 local bouldersOtherRunning = false
 local bouldersOtherCache = {}
@@ -694,3 +695,15 @@ do
     end)
 end
 
+-- === Гарантия видимости окна: AutoShow в Obsidian срабатывает один раз при
+-- создании окна; если в этот момент что-то из библиотечных аддонов пометило
+-- загрузку активной, окно может остаться скрытым. Через 3 секунды после
+-- полной загрузки всех модулей принудительно показываем, если скрыто. ===
+task.delay(3, function()
+    pcall(function()
+        local frame = Library.Window and Library.Window.MainFrame
+        if Library.Window and frame and (not Library.Toggled or not frame.Visible) then
+            Library:Toggle(true)
+        end
+    end)
+end)

@@ -18,6 +18,9 @@ local Remotes = E.Remotes
 local Library = E.Library
 local Window = E.Window
 local Tabs = E.Tabs
+local SettingsTab = E.SettingsTab
+local EventsTab = E.EventsTab
+local OtherTab = E.OtherTab
 local reportError = E.reportError
 local formatShort = E.formatShort
 local formatWeight = E.formatWeight
@@ -38,7 +41,6 @@ local teleportTo = E.teleportTo
 -- ====================================================================
 -- ВКЛАДКА EVENTS
 -- ====================================================================
-local EventsTab = Window:AddTab("Events", "calendar")
 local EventsBox = EventsTab:AddLeftGroupbox("Halloween 2026", "calendar")
 EventsBox:AddLabel("Event Halloween 2026", true)
 EventsBox:AddDivider()
@@ -611,7 +613,6 @@ do
     getgenv().UniverseUnload = _combined
     Library:OnUnload(_combined)
 end
-
 
 
 -- === Экспорт модуля ===

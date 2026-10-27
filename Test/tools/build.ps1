@@ -22,7 +22,7 @@ $mainExports = @(
     'Services','LocalPlayer','Mouse','Config','State','Storage','Connections','GuiRoot','Remotes',
     'ESP','PLAYER','PACE','TP','PICK','COLORS','TIER_NAMES','LUCK','MUTATION_LUCK','WATCHED_ATTRIBUTES',
     'SUFFIXES','PARSE_MULTIPLIERS','CONTAINER_NAMES',
-    'Library','SaveManager','ThemeManager','Window','Tabs','SettingsTab','EspHolder',
+    'Library','SaveManager','ThemeManager','Window','Tabs','SettingsTab','EventsTab','OtherTab','EspHolder',
     'reportError','formatShort','formatWeight','formatDistance','formatLuck','parseValue',
     'bindCharacter','getRoot','getAttr',
     'crystalValue','crystalWeight','crystalTier','crystalRarity','crystalName','crystalColor',
@@ -31,6 +31,21 @@ $mainExports = @(
     'backpackCapacity','backpackWeight','backpackFree','isCrystal','rebuildContainers','eachContainer',
     'requestStream','applyPivot','findClearGoal','finishTeleport','teleportTo','schedule'
 )
+
+$reshowCode = @'
+-- === Гарантия видимости окна: AutoShow в Obsidian срабатывает один раз при
+-- создании окна; если в этот момент что-то из библиотечных аддонов пометило
+-- загрузку активной, окно может остаться скрытым. Через 3 секунды после
+-- полной загрузки всех модулей принудительно показываем, если скрыто. ===
+task.delay(3, function()
+    pcall(function()
+        local frame = Library.Window and Library.Window.MainFrame
+        if Library.Window and frame and (not Library.Toggled or not frame.Visible) then
+            Library:Toggle(true)
+        end
+    end)
+end)
+'@
 
 $schedulerCode = @'
 -- === Центральный планировщик Heartbeat (перенесён из монолита) ===
@@ -178,12 +193,13 @@ $fragments = [ordered]@{
     }
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
-        Ranges = @('6233-6809')
+        Ranges = @('6233-6807')
         Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
         Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
-        Ranges = @('6811-7467')
+        Ranges = @('6810-7464')
+        ExtraBody = $reshowCode
         Exports = @()
         LocalImports = @('_eventsStops')
     }
@@ -227,7 +243,7 @@ foreach ($name in $fragments.Keys) {
             if ($name -in @('80_events.lua','90_other.lua') -and $imp -in @(
                 'ESP','PLAYER','PACE','TP','PICK','COLORS','TIER_NAMES','LUCK','MUTATION_LUCK',
                 'WATCHED_ATTRIBUTES','SUFFIXES','PARSE_MULTIPLIERS','CONTAINER_NAMES','SaveManager',
-                'ThemeManager','SettingsTab','EspHolder','formatDistance','bindCharacter','getRoot',
+                'ThemeManager','EspHolder','formatDistance','bindCharacter','getRoot',
                 'getAttr','crystalTier','crystalRarity','mutationLuck','combinedLuckMult','computeLuck',
                 'luckLabel','luckLabelText','meetsFilter','ownsGamepass','realStat','hasActiveRune',
                 'looksLikeCrystal','isCrystal','rebuildContainers','applyPivot','findClearGoal',
@@ -266,7 +282,7 @@ foreach ($name in $fragments.Keys) {
 
     foreach ($t in $body) { $parts.Add($t) }
 
-    if ($name -eq '00_main.lua') {
+    if ($f.ExtraBody) {
         $parts.Add($f.ExtraBody)
     }
 

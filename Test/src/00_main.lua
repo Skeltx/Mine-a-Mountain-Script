@@ -321,15 +321,15 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    crystals = Window:AddTab("Crystals", "gem"),
-    players = Window:AddTab("Players", "users"),
-    boulders = Window:AddTab("Boulders", "mountain"),
+    esp = Window:AddTab("ESP", "eye"),
     teleports = Window:AddTab("Teleports", "crosshair"),
     farming = Window:AddTab("Farming", "pickaxe"),
     movement = Window:AddTab("Movement", "zap"),
 }
 
+local EventsTab = Window:AddTab("Events", "calendar")
 local SettingsTab = Window:AddTab("Settings", "sliders-horizontal")
+local OtherTab = Window:AddTab("Other", "box")
 
 local EspHolder = Instance.new("Folder")
 EspHolder.Name = "UniverseCrystalEsp"
@@ -1025,6 +1025,8 @@ E.ThemeManager = ThemeManager
 E.Window = Window
 E.Tabs = Tabs
 E.SettingsTab = SettingsTab
+E.EventsTab = EventsTab
+E.OtherTab = OtherTab
 E.EspHolder = EspHolder
 E.reportError = reportError
 E.formatShort = formatShort
