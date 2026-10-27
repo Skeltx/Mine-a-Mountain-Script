@@ -55,11 +55,19 @@ local VirtualUser = Services.VirtualUser
 local isCandyRunning = false
 local origCol = {}
 
--- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель),
--- Anchored больше не отсеивает: конфеты-декорации под картой заякорены, их тоже собираем.
+-- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель).
+-- По скану CandyScan: настоящие конфеты — незаякоренные MeshPart в Workspace/DroppedCandy,
+-- а заякоренные "candy"-объекты (VFX_Candy_*, Deco_CandyBowl) — это эффекты и декорации,
+-- их собираемому касанию сервер не отдаёт — отсеиваем по Anchored.
 local function isCandy(obj)
     if not obj or not obj.Parent then return false end
     if not (obj:IsA("BasePart") or obj:IsA("Model")) then return false end
+    if obj:IsA("BasePart") then
+        if obj.Anchored then return false end
+    else
+        local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+        if part and part.Anchored then return false end
+    end
 
     local hit = string.lower(obj.Name):find("candy") ~= nil
     if not hit then
@@ -175,13 +183,21 @@ task.spawn(function()
                 if v:IsA("BasePart") and v.Parent and v.Parent:IsA("Model") and isCandy(v.Parent) then
                     continue
                 end
-                local pos = candyPos(v)
-                if not pos then continue end
+                -- до 3 попыток на конфету: телепорт прямо в точку, чуть выше, со сдвигом.
+                -- Если после захода конфета ещё на месте (сервер не засчитал касание) — пробуем снова.
+                for _, offset in ipairs({ Vector3.zero, Vector3.new(0, 1.5, 0), Vector3.new(1.2, 0.6, 0) }) do
+                    if not v.Parent or not isCandyRunning then break end
+                    local pos = candyPos(v)
+                    if not pos then break end
+                    toggleNoclip(char, true)
+                    hrp.CFrame = CFrame.new(pos + offset)
+                    task.wait(0.22)
+                    char = LocalPlayer.Character
+                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not (char and hrp) then break end
+                end
                 foundAny = true
-                toggleNoclip(char, true)
-                hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
                 candyCollected += 1
-                task.wait(0.35)
             end
         end
 

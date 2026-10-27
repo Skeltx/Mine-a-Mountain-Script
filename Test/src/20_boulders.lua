@@ -1284,6 +1284,11 @@ do
                     return kind
                 end
             end
+            -- неизвестный игре тип: имя модели само становится "типом" — так фармятся
+            -- любые новые валуны, добавленные разработчиком, без правки FARM_KINDS
+            if str ~= "" then
+                return str
+            end
             return nil
         end
 
@@ -1757,6 +1762,23 @@ do
             end
         end
 
+        -- Скан всех валунов на карте: уникальные типы для списка Targets/ESP
+        local function scanBoulderKinds()
+            local found, list = {}, {}
+            for _, container in ipairs(boulderRoots()) do
+                for _, child in ipairs(container:GetChildren()) do
+                    local attrName = getAttr(child, "BoulderName")
+                    local str = tostring(attrName or child.Name)
+                    if str ~= "" and not found[str] then
+                        found[str] = true
+                        list[#list + 1] = str
+                    end
+                end
+            end
+            table.sort(list)
+            return list
+        end
+
         local function setTargets(value)
             table.clear(targets)
             if type(value) == "table" then
@@ -1834,6 +1856,56 @@ do
             AllowNull = true,
             Callback = setTargets,
         })
+
+        -- Сканирует валуны, реально присутствующие на карте, и обновляет список Targets.
+        FarmBox:AddButton("Select All", function()
+            local present = scanBoulderKinds()
+            local values, seen = {}, {}
+            for _, kind in ipairs(FARM_KINDS) do
+                values[#values + 1] = kind
+                seen[kind] = true
+            end
+            for _, kind in ipairs(present) do
+                if not seen[kind] then
+                    values[#values + 1] = kind
+                    seen[kind] = true
+                end
+            end
+            local all = {}
+            for _, kind in ipairs(values) do
+                all[kind] = true
+            end
+            local dd = Library.Options and Library.Options.FarmTargets
+            if dd then
+                pcall(function() dd:SetValues(values) end)
+                pcall(function() dd:SetValue(all) end)
+            end
+            setTargets(all)
+            Library:Notify(string.format("Boulders на карте: %d типов (выбраны все)", #values), 3)
+        end)
+
+        FarmBox:AddButton("Clear Filter", function()
+            local present = scanBoulderKinds()
+            local values, seen = {}, {}
+            for _, kind in ipairs(FARM_KINDS) do
+                values[#values + 1] = kind
+                seen[kind] = true
+            end
+            for _, kind in ipairs(present) do
+                if not seen[kind] then
+                    values[#values + 1] = kind
+                    seen[kind] = true
+                end
+            end
+            local dd = Library.Options and Library.Options.FarmTargets
+            if dd then
+                pcall(function() dd:SetValues(values) end)
+                pcall(function() dd:SetValue({}) end)
+                pcall(function() dd:SetValue(nil) end)
+            end
+            setTargets(nil)
+            Library:Notify(string.format("Boulders на карте: %d типов (фильтр сброшен)", #values), 3)
+        end)
 
         FarmBox:AddToggle("AutoFarmBoulders", {
             Text = "Auto Farm",

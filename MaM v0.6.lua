@@ -4328,6 +4328,11 @@ do
                     return kind
                 end
             end
+            -- неизвестный игре тип: имя модели само становится "типом" — так фармятся
+            -- любые новые валуны, добавленные разработчиком, без правки FARM_KINDS
+            if str ~= "" then
+                return str
+            end
             return nil
         end
 
@@ -4801,6 +4806,23 @@ do
             end
         end
 
+        -- Скан всех валунов на карте: уникальные типы для списка Targets/ESP
+        local function scanBoulderKinds()
+            local found, list = {}, {}
+            for _, container in ipairs(boulderRoots()) do
+                for _, child in ipairs(container:GetChildren()) do
+                    local attrName = getAttr(child, "BoulderName")
+                    local str = tostring(attrName or child.Name)
+                    if str ~= "" and not found[str] then
+                        found[str] = true
+                        list[#list + 1] = str
+                    end
+                end
+            end
+            table.sort(list)
+            return list
+        end
+
         local function setTargets(value)
             table.clear(targets)
             if type(value) == "table" then
@@ -4878,6 +4900,56 @@ do
             AllowNull = true,
             Callback = setTargets,
         })
+
+        -- Сканирует валуны, реально присутствующие на карте, и обновляет список Targets.
+        FarmBox:AddButton("Select All", function()
+            local present = scanBoulderKinds()
+            local values, seen = {}, {}
+            for _, kind in ipairs(FARM_KINDS) do
+                values[#values + 1] = kind
+                seen[kind] = true
+            end
+            for _, kind in ipairs(present) do
+                if not seen[kind] then
+                    values[#values + 1] = kind
+                    seen[kind] = true
+                end
+            end
+            local all = {}
+            for _, kind in ipairs(values) do
+                all[kind] = true
+            end
+            local dd = Library.Options and Library.Options.FarmTargets
+            if dd then
+                pcall(function() dd:SetValues(values) end)
+                pcall(function() dd:SetValue(all) end)
+            end
+            setTargets(all)
+            Library:Notify(string.format("Boulders на карте: %d типов (выбраны все)", #values), 3)
+        end)
+
+        FarmBox:AddButton("Clear Filter", function()
+            local present = scanBoulderKinds()
+            local values, seen = {}, {}
+            for _, kind in ipairs(FARM_KINDS) do
+                values[#values + 1] = kind
+                seen[kind] = true
+            end
+            for _, kind in ipairs(present) do
+                if not seen[kind] then
+                    values[#values + 1] = kind
+                    seen[kind] = true
+                end
+            end
+            local dd = Library.Options and Library.Options.FarmTargets
+            if dd then
+                pcall(function() dd:SetValues(values) end)
+                pcall(function() dd:SetValue({}) end)
+                pcall(function() dd:SetValue(nil) end)
+            end
+            setTargets(nil)
+            Library:Notify(string.format("Boulders на карте: %d типов (фильтр сброшен)", #values), 3)
+        end)
 
         FarmBox:AddToggle("AutoFarmBoulders", {
             Text = "Auto Farm",
@@ -6176,11 +6248,19 @@ local VirtualUser = Services.VirtualUser
 local isCandyRunning = false
 local origCol = {}
 
--- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель),
--- Anchored больше не отсеивает: конфеты-декорации под картой заякорены, их тоже собираем.
+-- candy-совпадение ищем по ЛЮБОМУ предку (раньше — только имя и родитель).
+-- По скану CandyScan: настоящие конфеты — незаякоренные MeshPart в Workspace/DroppedCandy,
+-- а заякоренные "candy"-объекты (VFX_Candy_*, Deco_CandyBowl) — это эффекты и декорации,
+-- их собираемому касанию сервер не отдаёт — отсеиваем по Anchored.
 local function isCandy(obj)
     if not obj or not obj.Parent then return false end
     if not (obj:IsA("BasePart") or obj:IsA("Model")) then return false end
+    if obj:IsA("BasePart") then
+        if obj.Anchored then return false end
+    else
+        local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+        if part and part.Anchored then return false end
+    end
 
     local hit = string.lower(obj.Name):find("candy") ~= nil
     if not hit then
@@ -6296,13 +6376,21 @@ task.spawn(function()
                 if v:IsA("BasePart") and v.Parent and v.Parent:IsA("Model") and isCandy(v.Parent) then
                     continue
                 end
-                local pos = candyPos(v)
-                if not pos then continue end
+                -- до 3 попыток на конфету: телепорт прямо в точку, чуть выше, со сдвигом.
+                -- Если после захода конфета ещё на месте (сервер не засчитал касание) — пробуем снова.
+                for _, offset in ipairs({ Vector3.zero, Vector3.new(0, 1.5, 0), Vector3.new(1.2, 0.6, 0) }) do
+                    if not v.Parent or not isCandyRunning then break end
+                    local pos = candyPos(v)
+                    if not pos then break end
+                    toggleNoclip(char, true)
+                    hrp.CFrame = CFrame.new(pos + offset)
+                    task.wait(0.22)
+                    char = LocalPlayer.Character
+                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not (char and hrp) then break end
+                end
                 foundAny = true
-                toggleNoclip(char, true)
-                hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
                 candyCollected += 1
-                task.wait(0.35)
             end
         end
 
@@ -7267,6 +7355,7 @@ BouldersOtherBox:AddButton("Select All", function()
 end)
 
 BouldersOtherBox:AddButton("Clear Filter", function()
+    boulderScanFolder(true)
     bouldersOtherFilter = nil
     local dd = Library.Options.BoulderEspOtherFilter
     if dd then
@@ -7418,193 +7507,6 @@ do
             setFpsBoost(false)
         end
     end)
-end
-
--- ====================================================================
--- AUTO FARM BOULDERS (Analog) — фармит только выбранные валуны (фильтр ESP)
--- Живёт в боксе "Boulder ESP (Analog)" на вкладке Boulders.
--- ====================================================================
-do
-    local running = false
-    local brokenCount = 0
-    local cooldown = {} -- [model] = os.clock() + expire
-
-    local function stop()
-        running = false
-        table.clear(cooldown)
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
-            hum.JumpPower = 50
-        end
-        if brokenCount > 0 then
-            Library:Notify(string.format("Boulders Farm: сломано за сессию %d", brokenCount), 4)
-        end
-        brokenCount = 0
-    end
-
-    BouldersOtherBox:AddToggle("BouldersFarmOther", {
-        Text = "Auto Farm Boulders",
-        Default = false,
-        Callback = function(v)
-            if v then
-                running = true
-                brokenCount = 0
-            else
-                stop()
-            end
-        end,
-    })
-
-    -- фоновая экипировка кирки
-    task.spawn(function()
-        while task.wait(0.5) do
-            if not running then continue end
-
-            local char = LocalPlayer.Character
-            local held = char and char:FindFirstChildOfClass("Tool")
-            if held and isPickaxe(held) then continue end
-            pcall(equipPickaxe)
-        end
-    end)
-
-    task.spawn(function()
-        while task.wait(0.1) do
-            if not running then continue end
-
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if not (char and hrp and hum) then continue end
-
-            -- авто-продажа при полной сумке
-            pcall(autoSellIfFilled)
-
-            local cam = Services.Workspace.CurrentCamera
-
-            local md = Services.Workspace:FindFirstChild("MountainDecorations")
-            local folder = md and md:FindFirstChild("Boulders")
-            if not folder then continue end
-
-            -- чистим кулдауны
-            for obj, expire in pairs(cooldown) do
-                if os.clock() > expire or not obj.Parent then
-                    cooldown[obj] = nil
-                end
-            end
-
-            -- ближайший живой валун под фильтр
-            local best, bestDist = nil, math.huge
-            for _, model in ipairs(folder:GetChildren()) do
-                if model:IsA("Model") and not cooldown[model] then
-                    local hp = tonumber(model:GetAttribute("HP"))
-                    if hp ~= nil and hp > 0 and bouldersOtherIsEnabled(model.Name) then
-                        local anchor = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-                        if anchor then
-                            local d = (anchor.Position - hrp.Position).Magnitude
-                            if d < bestDist then
-                                bestDist = d
-                                best = model
-                            end
-                        end
-                    end
-                end
-            end
-
-            if not best then continue end
-
-            local target = best
-            cooldown[target] = os.clock() + 1e9
-            local anchor = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-            if not anchor then
-                cooldown[target] = os.clock() + 5
-                continue
-            end
-            local pos = anchor.Position
-
-            -- заморозка и позиция сверху валуна
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.zero
-            bv.Parent = hrp
-            hum.WalkSpeed = 0
-            hum.JumpPower = 0
-
-            local aimCFrame = CFrame.lookAt(pos + Vector3.new(0, 7, 0), pos)
-            local lockConn = Services.RunService.RenderStepped:Connect(function()
-                if hrp and hrp.Parent then
-                    hrp.CFrame = aimCFrame
-                end
-                if cam then
-                    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, pos + Vector3.new(0, 2, 0))
-                end
-            end)
-
-            task.wait(0.1)
-
-            pcall(equipPickaxe)
-            local tool = char:FindFirstChildOfClass("Tool")
-
-            local hp = tonumber(target:GetAttribute("HP"))
-            local seenDamage = false
-            local deadline = os.clock() + 15
-
-            while running and target.Parent and os.clock() < deadline do
-                if tool and tool.Parent then
-                    pcall(function() tool:Activate() end)
-                    if DigRequest then
-                        pcall(function() DigRequest:FireServer(tool.Name, pos) end)
-                    end
-                end
-
-                local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if prompt then
-                    pcall(function()
-                        prompt.MaxActivationDistance = 99999
-                        prompt.RequiresLineOfSight = false
-                        prompt.HoldDuration = 0
-                        if fireproximityprompt then fireproximityprompt(prompt) end
-                    end)
-                end
-
-                task.wait(0.2)
-
-                local newHP = tonumber(target:GetAttribute("HP"))
-                if newHP ~= nil then
-                    if hp ~= nil and newHP < hp then
-                        seenDamage = true
-                    end
-                    hp = newHP
-                    if newHP <= 0 then
-                        seenDamage = true
-                        break
-                    end
-                end
-            end
-
-            local broken = (not target.Parent) or (hp ~= nil and hp <= 0)
-            if broken then
-                brokenCount += 1
-                if brokenCount % 5 == 0 then
-                    Library:Notify(string.format("Boulders Farm: сломано %d", brokenCount), 3)
-                end
-            end
-
-            -- кулдаун повторной атаки: добили -> долго, частично -> скоро, промах -> долго
-            cooldown[target] = os.clock() + (broken and 30 or (seenDamage and 5 or 30))
-
-            if lockConn then
-                lockConn:Disconnect()
-            end
-            pcall(function() bv:Destroy() end)
-            if hum and hum.Parent then
-                hum.WalkSpeed = 16
-                hum.JumpPower = 50
-            end
-        end
-    end)
-
-    otherWrapUnload(stop)
 end
 end -- __initAuthorBlock
 

@@ -141,21 +141,21 @@ $fragments = [ordered]@{
     }
     '20_boulders.lua' = @{
         Title = 'BOULDERS — движок Mountain (копание валунов), aimTeleport, вкладка Boulders, Boulder Farm'
-        Ranges = @('2074-2710', '3276-3309', '3801-4923')
+        Ranges = @('2074-2710', '3276-3309', '3801-4995')
         Exports = @('Mountain','Farm','aimTeleport','tpToRank','fireRemote','unfavoriteAll','mountainSpot','mountainSpan','getSellCFrame')
         LocalImports = @('newLabel')
         LazyImports = @('Move','crystalPrompt','firePrompt','sortedByScore')
     }
     '30_farm.lua' = @{
         Title = 'FARM — промпты/авто-сбор кристаллов, бэкпак, Auto Farm Crystal'
-        Ranges = @('1487-1898', '3434-3464', '4924-5862', '5943-5947')
+        Ranges = @('1487-1898', '3434-3464', '4996-5934', '6015-6019')
         Exports = @('Money','restoreInstantPrompts','crystalPrompt','firePrompt')
         LocalImports = @('Mountain','Farm','fireRemote','unfavoriteAll','mountainSpot','mountainSpan')
         LazyImports = @('Move')
     }
     '40_shop.lua' = @{
         Title = 'SHOP — Bomb Auto Buy (закупка бомб)'
-        Ranges = @('5864-5941')
+        Ranges = @('5936-6013')
         Exports = @()
     }
     '50_teleports.lua' = @{
@@ -172,18 +172,18 @@ $fragments = [ordered]@{
     }
     '70_settings.lua' = @{
         Title = 'SETTINGS — SaveManager, ThemeManager, вкладка Settings, cleanupAll/unload'
-        Ranges = @('5949-6157')
+        Ranges = @('6021-6229')
         Exports = @()
         LocalImports = @('Mountain','Farm','Money','Net','Move','setSpeedBoost','restoreInstantPrompts','clearRegistry','clearPlayerEsp','unwatchContainers')
     }
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
-        Ranges = @('6159-6742')
+        Ranges = @('6231-6830')
         Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
         Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
-        Ranges = @('6745-7608')
+        Ranges = @('6833-7510')
         Exports = @()
         LocalImports = @('_eventsStops')
     }
