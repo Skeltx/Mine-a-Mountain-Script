@@ -4,7 +4,7 @@
 -- Остановка при первой ошибке — с указанием сломанного модуля.
 -- ============================================================
 
-local BASE = "https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/test/Test/src/"
+local BASE = "https://raw.githubusercontent.com/Skeltx/Mine-a-Mountain-Script/main/Test/src/"
 
 local MODULES = {
     "00_main.lua",      -- ядро: сервисы, стейт, окно/вкладки, хелперы
