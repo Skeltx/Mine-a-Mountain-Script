@@ -182,8 +182,8 @@ $fragments = [ordered]@{
         Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
-        Title = 'OTHER — вкладка Other (Collect Rune, Boulders ESP/Farm, FPS Boost)'
-        Ranges = @('6685-7546')
+        Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
+        Ranges = @('6685-7548')
         Exports = @()
         LocalImports = @('_eventsStops')
     }

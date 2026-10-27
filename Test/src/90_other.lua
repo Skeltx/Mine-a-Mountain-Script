@@ -1,6 +1,6 @@
 -- ============================================================
 -- MaM :: 90_other.lua
--- OTHER — вкладка Other (Collect Rune, Boulders ESP/Farm, FPS Boost)
+-- OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders
 -- Все общие имена приходят из getgenv().MaMEnv (заполняет 00_main).
 -- ============================================================
 
@@ -133,8 +133,9 @@ end)
 
 -- ====================================================================
 -- BOULDERS ESP (Other) — все валуны, фильтр по типам
+-- (перенесено из вкладки Other в Boulders как отдельный аналог ESP)
 -- ====================================================================
-local BouldersOtherBox = OtherTab:AddRightGroupbox("Boulders ESP", "mountain")
+local BouldersOtherBox = Tabs.boulders:AddLeftGroupbox("Boulder ESP (Analog)", "mountain")
 
 local bouldersOtherRunning = false
 local bouldersOtherCache = {}
@@ -714,7 +715,8 @@ do
 end
 
 -- ====================================================================
--- AUTO FARM BOULDERS (Other) — фармит только выбранные валуны (фильтр ESP)
+-- AUTO FARM BOULDERS (Analog) — фармит только выбранные валуны (фильтр ESP)
+-- Живёт в боксе "Boulder ESP (Analog)" на вкладке Boulders.
 -- ====================================================================
 do
     local running = false
