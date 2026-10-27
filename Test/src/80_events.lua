@@ -135,30 +135,6 @@ EventsBox:AddToggle("AutoCandy", {
     end
 })
 
--- Диагностика: один проход по Workspace, все объекты с "candy" в любом месте пути.
--- Результат — в консоль (F9). Показывает, как называются конфеты и где лежат.
-EventsBox:AddButton("Candy Scan (debug)", function()
-    local ws = Services.Workspace
-    local count = 0
-    for _, v in ipairs(ws:GetDescendants()) do
-        local parts = {}
-        local p = v
-        while p and p ~= ws do
-            table.insert(parts, 1, p.Name)
-            p = p.Parent
-        end
-        local path = table.concat(parts, "/")
-        if string.lower(path):find("candy") then
-            count += 1
-            local anchored = "-"
-            if v:IsA("BasePart") then anchored = tostring(v.Anchored) end
-            print(string.format("[CandyScan] %s (%s) :: %s :: anchored=%s", v.Name, v.ClassName, path, anchored))
-        end
-    end
-    print(string.format("[CandyScan] всего: %d", count))
-    Library:Notify("Candy Scan: " .. count .. " совпадений, смотри консоль (F9)", 5)
-end)
-
 table.insert(_eventsStops, function()
     isCandyRunning = false
     toggleNoclip(LocalPlayer.Character, false)
@@ -635,6 +611,7 @@ do
     getgenv().UniverseUnload = _combined
     Library:OnUnload(_combined)
 end
+
 
 
 -- === Экспорт модуля ===

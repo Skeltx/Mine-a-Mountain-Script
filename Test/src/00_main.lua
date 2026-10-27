@@ -748,6 +748,167 @@ local function eachContainer(fn)
 end
 
 
+local function requestStream(position)
+    if typeof(position) ~= "Vector3" then
+        return
+    end
+
+    local now = os.clock()
+    if State.streamSpot and now - State.streamMark < 0.3 and (State.streamSpot - position).Magnitude < 32 then
+        return
+    end
+
+    State.streamMark = now
+    State.streamSpot = position
+
+    task.spawn(function()
+        pcall(function()
+            LocalPlayer:RequestStreamAroundAsync(position, 1)
+        end)
+    end)
+end
+
+local function applyPivot(cframe)
+    local character = LocalPlayer.Character
+    if not character then
+        return false
+    end
+
+    requestStream(cframe.Position)
+
+    local root = getRoot()
+    if not root then
+        return false
+    end
+
+    local moved = pcall(function()
+        character:PivotTo(cframe)
+    end)
+
+    if not moved then
+        moved = pcall(function()
+            root.CFrame = cframe
+        end)
+    end
+
+    if not moved then
+        return false
+    end
+
+    pcall(function()
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+
+    return true
+end
+
+local function findClearGoal(position, ignore)
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = ignore
+    params.MaxParts = 1
+
+    for _, offset in ipairs(TP.clear) do
+        local candidate = position + offset
+        local ok, hits = pcall(function()
+            return Services.Workspace:GetPartBoundsInRadius(candidate, 2.5, params)
+        end)
+
+        if ok and #hits == 0 then
+            return candidate
+        end
+    end
+
+    return position + TP.clear[#TP.clear]
+end
+
+local function finishTeleport()
+    if not State.tpState then
+        return
+    end
+
+    local root = getRoot()
+    if root then
+        pcall(function()
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        pcall(function()
+            humanoid.PlatformStand = false
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end)
+    end
+
+    State.tpState = nil
+end
+
+local function teleportTo(target)
+    local position
+    if typeof(target) == "Vector3" then
+        position = target
+    elseif typeof(target) == "Instance" and target.Parent then
+        position = target.Position
+    end
+
+    if not position then
+        return false
+    end
+
+    local character = LocalPlayer.Character
+    if not character then
+        return false
+    end
+
+    local root = getRoot()
+    if not root then
+        return false
+    end
+
+    finishTeleport()
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        pcall(function()
+            if humanoid.SeatPart or humanoid.Sit then
+                humanoid.Sit = false
+            end
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        end)
+    end
+
+    local ignore = { character }
+    if typeof(target) == "Instance" then
+        ignore[#ignore + 1] = target
+    end
+
+    local goalFrame = CFrame.new(findClearGoal(position + TP.offset, ignore))
+    if not applyPivot(goalFrame) then
+        return false
+    end
+
+    State.tpState = {
+        goal = goalFrame,
+        holdUntil = os.clock() + TP.hold,
+    }
+
+    return true
+end
+
+local function schedule(delay, fn)
+    Storage.pendingActions[#Storage.pendingActions + 1] = { at = os.clock() + delay, fn = fn }
+end
+
+
 -- === Центральный планировщик Heartbeat (перенесён из монолита) ===
 -- Каждый модуль регистрирует свои тик-функции через E.* — см. футеры модулей.
 Connections.schedulerConn = Services.RunService.Heartbeat:Connect(function(deltaTime)

@@ -758,7 +758,9 @@ local Farm = {}
 
 do
     local function install()
-        local FARM_KINDS = { "Mossite", "Voltite", "Gildrite", "Rimeveil", "Nocturnite" }
+        -- Пресеты типов валунов убраны: список Targets заполняется автоматически
+        -- сканом карты (кнопки Select All / Clear Filter).
+        local FARM_KINDS = {}
 
         local SCAN_SPOTS = {
             CFrame.new(-12.7105675, 459.090942, 818.847412, 0.993408799, -0.00500036497, -0.11451605, 0.000644713698, 0.999275982, -0.0380407833, 0.114623353, 0.0377162211, 0.992692769),

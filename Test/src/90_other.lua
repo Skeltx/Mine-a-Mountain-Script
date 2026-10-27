@@ -507,15 +507,8 @@ BouldersOtherBox:AddToggle("BoulderEspOtherToggle", {
 
 BouldersOtherBox:AddDivider()
 
--- Предзаполняем известные типы (все включены)
-do
-    local known = {}
-    for name in pairs(bouldersOtherKnownColors) do
-        known[name] = true
-        bouldersOtherKnownNames[name] = true
-    end
-    bouldersOtherFilter = known
-end
+-- Пресеты типов убраны: типы появляются в списке автоматически по мере скана карты
+-- (фоновый скан при включённом ESP, а также кнопки Select All / Clear Filter).
 
 BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     Text = "Show only these",
@@ -524,20 +517,6 @@ BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     AllowNull = true,
     Callback = bouldersOtherSetFilter,
 })
-
--- Синхронизируем dropdown с известными типами
-do
-    local dd = Library.Options.BoulderEspOtherFilter
-    if dd then
-        local list = {}
-        for name in pairs(bouldersOtherKnownNames) do list[#list + 1] = name end
-        table.sort(list)
-        pcall(function() dd:SetValues(list) end)
-        if bouldersOtherFilter then
-            pcall(function() dd:SetValue(bouldersOtherFilter) end)
-        end
-    end
-end
 
 BouldersOtherBox:AddButton("Select All", function()
     -- Подгружаем все типы валунов, реально присутствующие на сервере, прямо сейчас

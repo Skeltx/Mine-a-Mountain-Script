@@ -124,7 +124,7 @@ end)
 $fragments = [ordered]@{
     '00_main.lua' = @{
         Title = 'CORE — конфиг, сервисы, стейт, UI-окно, общие хелперы'
-        Ranges = @('1-738')
+        Ranges = @('1-738', '1327-1486')
         Imports = @()
         ExtraBody = $schedulerCode
         Exports = $mainExports
@@ -141,21 +141,21 @@ $fragments = [ordered]@{
     }
     '20_boulders.lua' = @{
         Title = 'BOULDERS — движок Mountain (копание валунов), aimTeleport, вкладка Boulders, Boulder Farm'
-        Ranges = @('2074-2710', '3276-3309', '3801-4995')
+        Ranges = @('2074-2710', '3276-3309', '3801-4997')
         Exports = @('Mountain','Farm','aimTeleport','tpToRank','fireRemote','unfavoriteAll','mountainSpot','mountainSpan','getSellCFrame')
         LocalImports = @('newLabel')
         LazyImports = @('Move','crystalPrompt','firePrompt','sortedByScore')
     }
     '30_farm.lua' = @{
         Title = 'FARM — промпты/авто-сбор кристаллов, бэкпак, Auto Farm Crystal'
-        Ranges = @('1487-1898', '3434-3464', '4996-5934', '6015-6019')
+        Ranges = @('1487-1898', '3434-3464', '4998-5936', '6017-6021')
         Exports = @('Money','restoreInstantPrompts','crystalPrompt','firePrompt')
         LocalImports = @('Mountain','Farm','fireRemote','unfavoriteAll','mountainSpot','mountainSpan')
         LazyImports = @('Move')
     }
     '40_shop.lua' = @{
         Title = 'SHOP — Bomb Auto Buy (закупка бомб)'
-        Ranges = @('5936-6013')
+        Ranges = @('5938-6015')
         Exports = @()
     }
     '50_teleports.lua' = @{
@@ -172,18 +172,18 @@ $fragments = [ordered]@{
     }
     '70_settings.lua' = @{
         Title = 'SETTINGS — SaveManager, ThemeManager, вкладка Settings, cleanupAll/unload'
-        Ranges = @('6021-6229')
+        Ranges = @('6023-6231')
         Exports = @()
         LocalImports = @('Mountain','Farm','Money','Net','Move','setSpeedBoost','restoreInstantPrompts','clearRegistry','clearPlayerEsp','unwatchContainers')
     }
     '80_events.lua' = @{
         Title = 'EVENTS — вкладка Events (Halloween 2026: candy/ghost/pumpkin)'
-        Ranges = @('6231-6830')
+        Ranges = @('6233-6809')
         Exports = @('_eventsStops')
     }
     '90_other.lua' = @{
         Title = 'OTHER — Other (Collect Rune, FPS Boost) + перенос Boulders ESP/Farm (Analog) в Boulders'
-        Ranges = @('6833-7510')
+        Ranges = @('6811-7467')
         Exports = @()
         LocalImports = @('_eventsStops')
     }

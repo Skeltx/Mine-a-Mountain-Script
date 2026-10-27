@@ -3802,7 +3802,9 @@ local Farm = {}
 
 do
     local function install()
-        local FARM_KINDS = { "Mossite", "Voltite", "Gildrite", "Rimeveil", "Nocturnite" }
+        -- Пресеты типов валунов убраны: список Targets заполняется автоматически
+        -- сканом карты (кнопки Select All / Clear Filter).
+        local FARM_KINDS = {}
 
         local SCAN_SPOTS = {
             CFrame.new(-12.7105675, 459.090942, 818.847412, 0.993408799, -0.00500036497, -0.11451605, 0.000644713698, 0.999275982, -0.0380407833, 0.114623353, 0.0377162211, 0.992692769),
@@ -6328,30 +6330,6 @@ EventsBox:AddToggle("AutoCandy", {
     end
 })
 
--- Диагностика: один проход по Workspace, все объекты с "candy" в любом месте пути.
--- Результат — в консоль (F9). Показывает, как называются конфеты и где лежат.
-EventsBox:AddButton("Candy Scan (debug)", function()
-    local ws = Services.Workspace
-    local count = 0
-    for _, v in ipairs(ws:GetDescendants()) do
-        local parts = {}
-        local p = v
-        while p and p ~= ws do
-            table.insert(parts, 1, p.Name)
-            p = p.Parent
-        end
-        local path = table.concat(parts, "/")
-        if string.lower(path):find("candy") then
-            count += 1
-            local anchored = "-"
-            if v:IsA("BasePart") then anchored = tostring(v.Anchored) end
-            print(string.format("[CandyScan] %s (%s) :: %s :: anchored=%s", v.Name, v.ClassName, path, anchored))
-        end
-    end
-    print(string.format("[CandyScan] всего: %d", count))
-    Library:Notify("Candy Scan: " .. count .. " совпадений, смотри консоль (F9)", 5)
-end)
-
 table.insert(_eventsStops, function()
     isCandyRunning = false
     toggleNoclip(LocalPlayer.Character, false)
@@ -7301,15 +7279,8 @@ BouldersOtherBox:AddToggle("BoulderEspOtherToggle", {
 
 BouldersOtherBox:AddDivider()
 
--- Предзаполняем известные типы (все включены)
-do
-    local known = {}
-    for name in pairs(bouldersOtherKnownColors) do
-        known[name] = true
-        bouldersOtherKnownNames[name] = true
-    end
-    bouldersOtherFilter = known
-end
+-- Пресеты типов убраны: типы появляются в списке автоматически по мере скана карты
+-- (фоновый скан при включённом ESP, а также кнопки Select All / Clear Filter).
 
 BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     Text = "Show only these",
@@ -7318,20 +7289,6 @@ BouldersOtherBox:AddDropdown("BoulderEspOtherFilter", {
     AllowNull = true,
     Callback = bouldersOtherSetFilter,
 })
-
--- Синхронизируем dropdown с известными типами
-do
-    local dd = Library.Options.BoulderEspOtherFilter
-    if dd then
-        local list = {}
-        for name in pairs(bouldersOtherKnownNames) do list[#list + 1] = name end
-        table.sort(list)
-        pcall(function() dd:SetValues(list) end)
-        if bouldersOtherFilter then
-            pcall(function() dd:SetValue(bouldersOtherFilter) end)
-        end
-    end
-end
 
 BouldersOtherBox:AddButton("Select All", function()
     -- Подгружаем все типы валунов, реально присутствующие на сервере, прямо сейчас
